@@ -22,11 +22,29 @@ export function evidenceLink(slug: Slug, pr: number, file: string): string {
   return IMAGE_EXT.has(extname(name).toLowerCase()) ? `!${link}` : link;
 }
 
-function remoteHasBranch(cwd: string): boolean {
-  return run("git", ["ls-remote", "--heads", "origin", BRANCH], cwd) !== "";
+const ATTEMPTS = 3;
+
+/** Fetch the remote evidence tip into refs/remotes/origin/<branch>; null when the remote has no such branch. */
+function fetchTip(cwd: string): string | null {
+  const line = run("git", ["ls-remote", "--heads", "origin", BRANCH], cwd);
+  if (line === "") return null;
+  run("git", ["fetch", "-q", "origin", `+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}`], cwd);
+  return run("git", ["rev-parse", `refs/remotes/origin/${BRANCH}`], cwd);
 }
 
-/** Commit files to pr-<n>/ on the orphan evidence branch through a temp worktree, push, and return markdown links. */
+function remoteMoved(cwd: string, base: string | null): boolean {
+  try {
+    return fetchTip(cwd) !== base;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Commit files to pr-<n>/ on the orphan evidence branch and push, returning markdown links.
+ * Commits are built with plumbing in a detached temp worktree, so no local branch is ever created.
+ * A push that loses a race is retried on the fresh remote tip.
+ */
 export function pushEvidence(opts: { cwd: string; pr: number; files: string[]; slug?: Slug }): string[] {
   const { cwd, pr } = opts;
   const slug = opts.slug ?? repoSlug(cwd);
@@ -37,24 +55,27 @@ export function pushEvidence(opts: { cwd: string; pr: number; files: string[]; s
   const wt = join(parent, "wt");
   let added = false;
   try {
-    if (remoteHasBranch(cwd)) {
-      run("git", ["fetch", "-q", "origin", `+refs/heads/${BRANCH}:refs/remotes/origin/${BRANCH}`], cwd);
-      run("git", ["worktree", "add", "-q", "--detach", wt, `origin/${BRANCH}`], cwd);
-      added = true;
-    } else {
-      run("git", ["worktree", "add", "-q", "--detach", wt], cwd);
-      added = true;
-      run("git", ["checkout", "-q", "--orphan", BRANCH], wt);
-      run("git", ["rm", "-rfq", "--ignore-unmatch", "."], wt);
-    }
+    run("git", ["worktree", "add", "-q", "--detach", "--no-checkout", wt], cwd);
+    added = true;
     const dir = join(wt, `pr-${pr}`);
     mkdirSync(dir, { recursive: true });
     for (const f of files) copyFileSync(f, join(dir, basename(f)));
-    run("git", ["add", "--", `pr-${pr}`], wt);
-    if (run("git", ["status", "--porcelain"], wt) !== "") {
-      run("git", ["commit", "-q", "-m", `evidence: pr-${pr}`], wt);
+
+    for (let attempt = 1; ; attempt++) {
+      const base = fetchTip(cwd);
+      run("git", base ? ["read-tree", base] : ["read-tree", "--empty"], wt);
+      run("git", ["add", "-f", "--", `pr-${pr}`], wt);
+      const tree = run("git", ["write-tree"], wt);
+      if (base && tree === run("git", ["rev-parse", `${base}^{tree}`], wt)) break;
+      const msg = `evidence: pr-${pr}`;
+      const commit = run("git", ["commit-tree", tree, ...(base ? ["-p", base] : []), "-m", msg], wt);
+      try {
+        run("git", ["push", "-q", "origin", `${commit}:refs/heads/${BRANCH}`], wt);
+        break;
+      } catch (e) {
+        if (attempt >= ATTEMPTS || !remoteMoved(cwd, base)) throw e;
+      }
     }
-    run("git", ["push", "-q", "origin", `HEAD:refs/heads/${BRANCH}`], wt);
   } finally {
     if (added) {
       try {
