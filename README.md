@@ -178,6 +178,10 @@ node scripts/config.ts set <key> <json> [--project]
 node scripts/config.ts model <role>
 ```
 
+## Verify
+
+`npm run verify` runs the tests, typecheck, lint, and plugin validation, smoke-runs every script CLI offline, and checks that every playbook, skill, agent, and model role reference resolves. It prints `PASS`, `FAIL`, or `SKIP` per check and exits 1 on any failure. `docs/feature-map.md` lists each feature and how it is proved. Features that need a live GitHub repo are in `docs/acceptance/`.
+
 ## Guide
 
 Task-oriented pages are in [docs/guide](docs/guide/README.md).
