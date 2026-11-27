@@ -1,7 +1,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { chmodSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { evidenceUrl, pushEvidence } from "../scripts/evidence.ts";
@@ -73,6 +73,51 @@ test("push creates the orphan branch, then appends", () => {
   assert.equal(git(repo, "rev-parse", "--abbrev-ref", "HEAD"), "main");
   assert.equal(git(repo, "status", "--porcelain"), "");
   assert.equal(git(repo, "worktree", "list").split("\n").length, 1, "temp worktree removed");
+  assert.equal(git(repo, "branch", "--list", "astack-evidence"), "", "no local evidence branch");
+});
+
+test("push succeeds when a stale local astack-evidence branch exists", () => {
+  const { repo, bare } = makeRepoWithRemote();
+  git(repo, "branch", "astack-evidence");
+  const f = join(tmp("astack-ev-files-"), "shot.png");
+  writeFileSync(f, "png");
+  pushEvidence({ cwd: repo, pr: 4, files: [f], slug });
+  assert.equal(git(bare, "ls-tree", "-r", "--name-only", "astack-evidence"), "pr-4/shot.png");
+  assert.equal(git(bare, "rev-list", "--count", "astack-evidence"), "1");
+  assert.equal(spawnSync("git", ["merge-base", "main", "astack-evidence"], { cwd: bare }).status, 1);
+});
+
+test("push retries when the remote moves between fetch and push", () => {
+  const { repo, bare } = makeRepoWithRemote();
+  const files = tmp("astack-ev-files-");
+  const first = join(files, "a.png");
+  writeFileSync(first, "a");
+  pushEvidence({ cwd: repo, pr: 1, files: [first], slug });
+
+  const rival = tmp("astack-ev-rival-");
+  git(rival, "clone", "-q", "-b", "astack-evidence", bare, ".");
+  git(rival, "config", "user.email", "r@r");
+  git(rival, "config", "user.name", "r");
+  writeFileSync(join(rival, "rival.txt"), "rival");
+  git(rival, "add", "rival.txt");
+  git(rival, "commit", "-q", "-m", "rival");
+
+  const marker = join(files, "raced");
+  const hook = join(repo, ".git", "hooks", "pre-push");
+  writeFileSync(
+    hook,
+    `#!/bin/sh\n[ -e "${marker}" ] && exit 0\ntouch "${marker}"\nunset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE\ngit -C "${rival}" push -q origin HEAD:refs/heads/astack-evidence\n`,
+  );
+  chmodSync(hook, 0o755);
+
+  const second = join(files, "b.png");
+  writeFileSync(second, "b");
+  pushEvidence({ cwd: repo, pr: 2, files: [second], slug });
+  assert.equal(
+    git(bare, "ls-tree", "-r", "--name-only", "astack-evidence"),
+    "pr-1/a.png\npr-2/b.png\nrival.txt",
+  );
+  assert.equal(git(bare, "rev-list", "--count", "astack-evidence"), "3");
 });
 
 test("CLI exits 2 when origin is not GitHub", () => {
