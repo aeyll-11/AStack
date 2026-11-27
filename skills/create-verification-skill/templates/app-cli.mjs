@@ -64,6 +64,12 @@ export function parseTarget(spec) {
 
 export const withPort = (s, port) => s.replaceAll("{port}", String(port));
 
+export function parsePort(v) {
+  const n = typeof v === "number" ? v : /^\d+$/.test(String(v)) ? Number(v) : NaN;
+  if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error(`port must be an integer in 1..65535, got "${v}"`);
+  return n;
+}
+
 export function parseConfigBlock(source) {
   const m = /\/\* astack-config\n([\s\S]*?)\nastack-config \*\//.exec(source);
   if (!m) throw new Error("no astack-config block found");
@@ -94,7 +100,7 @@ const SELF = fileURLToPath(import.meta.url);
 const ROOT = process.env.APP_ROOT ?? resolve(dirname(SELF), "../../../..");
 const DIR = join(ROOT, ".astack", "verify");
 const F = { app: join(DIR, "app.json"), session: join(DIR, "session.json"), state: join(DIR, "state.json"), jar: join(DIR, "cookies.txt"), console: join(DIR, "console.log"),
-  offset: join(DIR, "console.offset"), appLog: join(DIR, "app.log"), browserLog: join(DIR, "browser.log"), profile: join(DIR, "profile") };
+  offset: join(DIR, "console.offset"), lastUrl: join(DIR, "last-url"), appLog: join(DIR, "app.log"), browserLog: join(DIR, "browser.log"), profile: join(DIR, "profile") };
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
 const alive = (pid) => { if (!(pid > 0)) return false; try { process.kill(pid, 0); return true; } catch { return false; } };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -110,7 +116,8 @@ function playwright() {
 
 function context(flags) {
   const cfg = parseConfigBlock(readFileSync(SELF, "utf8"));
-  const port = Number(flags.port ?? readJson(F.app)?.port ?? cfg.port);
+  let port;
+  try { port = parsePort(flags.port ?? readJson(F.app)?.port ?? cfg.port); } catch (e) { throw new Exit(2, e.message); }
   return { cfg, port, base: withPort(cfg.baseUrl, port) };
 }
 
@@ -118,6 +125,11 @@ function listeners(port) {
   const r = spawnSync("lsof", ["-tnP", `-iTCP:${port}`, "-sTCP:LISTEN"], { encoding: "utf8" });
   return r.stdout.split("\n").filter(Boolean).map(Number);
 }
+// Playwright starts Chromium in its own process group, so signal the daemon's group and each child's group.
+function killTree(pid, sig, kids = childrenOf(pid)) {
+  for (const p of [pid, ...kids]) { try { process.kill(-p, sig); } catch { try { process.kill(p, sig); } catch {} } }
+}
+const childrenOf = (pid) => spawnSync("pgrep", ["-P", String(pid)], { encoding: "utf8" }).stdout.split("\n").filter(Boolean).map(Number);
 const pgid = (pid) => Number(spawnSync("ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }).stdout.trim());
 
 async function status(url, opts = {}) {
@@ -195,6 +207,7 @@ async function serve(flags) {
   };
   ctx.pages().forEach(hook);
   ctx.on("page", hook);
+  ctx.on("close", () => process.exit(1));
   const ctl = createServer(async (req, res) => {
     const u = new URL(req.url, "http://x");
     try {
@@ -218,20 +231,29 @@ async function startBrowser(flags) {
   playwright();
   rmSync(F.session, { force: true });
   const log = openSync(F.browserLog, "a");
-  spawn(process.execPath, [SELF, "__serve", ...(flags.headed ? ["--headed"] : [])], { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: process.env }).unref();
+  const child = spawn(process.execPath, [SELF, "__serve", ...(flags.headed ? ["--headed"] : [])], { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: process.env });
+  child.unref();
   closeSync(log);
-  for (let i = 0; i < 120; i++) {
+  writeFileSync(F.session, JSON.stringify({ pid: child.pid }));
+  for (let i = 0; i < 120 && alive(child.pid); i++) {
     const n = readJson(F.session);
-    if (n) return say(`ok start pid=${n.pid} headed=${n.headed}`);
+    if (n?.wsEndpoint) return say(`ok start pid=${n.pid} headed=${n.headed}`);
     await sleep(250);
   }
+  killTree(child.pid, "SIGKILL");
+  rmSync(F.session, { force: true });
   const tail = readFileSync(F.browserLog, "utf8").split("\n").slice(-20).join("\n");
   throw new Exit(tail.includes("Executable doesn't exist") ? 3 : 1, `browser did not start. Try: (cd ${ROOT} && npx playwright install chromium)\n${tail}`);
 }
 
-function stopBrowser() {
+async function stopBrowser() {
   const s = readJson(F.session);
-  if (s && alive(s.pid)) process.kill(s.pid, "SIGTERM");
+  if (s?.pid > 0) {
+    const kids = childrenOf(s.pid);
+    killTree(s.pid, "SIGTERM", kids);
+    for (let i = 0; i < 20 && [s.pid, ...kids].some(alive); i++) await sleep(250);
+    killTree(s.pid, "SIGKILL", kids);
+  }
   rmSync(F.session, { force: true });
   say(`ok stop${s ? ` pid=${s.pid}` : " (nothing running)"}`);
 }
@@ -256,7 +278,11 @@ async function snapshotOf(page) {
 async function withPage(x, flags, fn) {
   const chromium = playwright();
   if (!alive(readJson(F.session)?.pid)) await startBrowser(flags);
-  const browser = await chromium.connectOverCDP(readJson(F.session).wsEndpoint);
+  const cli = `node ${SELF}`;
+  const last = existsSync(F.lastUrl) ? ` Last URL: ${readFileSync(F.lastUrl, "utf8")}` : "";
+  const browser = await chromium.connectOverCDP(readJson(F.session)?.wsEndpoint ?? "").catch(() => {
+    throw new Exit(1, `browser gone: run \`${cli} stop && ${cli} start\`, then reopen the page.${last}`);
+  });
   const ctx = browser.contexts()[0];
   const page = ctx.pages().filter((p) => !p.isClosed()).at(-1) ?? (await ctx.newPage());
   page.setDefaultTimeout(Number(flags.timeout ?? 10000));
@@ -264,6 +290,7 @@ async function withPage(x, flags, fn) {
     const out = await fn(page, ctx);
     await settle(page, x.cfg);
     await ctx.storageState({ path: F.state });
+    writeFileSync(F.lastUrl, page.url());
     saveJar();
     return out;
   } catch (e) {
@@ -315,7 +342,7 @@ async function main(argv) {
     case "launch": return launch(x);
     case "doctor": return doctor(x);
     case "start": return startBrowser(flags);
-    case "stop": return stopBrowser();
+    case "stop": return await stopBrowser();
     case "open": return withPage(x, flags, async (p) => { await open(p, x, need(args[0], "open <route>")); say(`ok open ${p.url()}`); });
     case "click": return withPage(x, flags, async (p) => { await act(p, x, ["click", need(args[0], "click <target>")]); say(`ok click ${args[0]} url=${p.url()}`); });
     case "fill": return withPage(x, flags, async (p) => { await act(p, x, ["fill", need(args[0], "fill <target> <text>"), args[1] ?? ""]); say(`ok fill ${args[0]}`); });
@@ -367,7 +394,7 @@ async function main(argv) {
       if (code !== 0) throw new Exit(1, `seed failed: exit ${code}`);
       return say("ok seed");
     }
-    case "cleanup": stopBrowser(); await killApp(x); return say(`ok cleanup kept=${DIR}/console.log and your evidence`);
+    case "cleanup": await stopBrowser(); await killApp(x); return say(`ok cleanup kept=${DIR}/console.log and your evidence`);
     case "status": {
       const app = readJson(F.app), s = readJson(F.session);
       return say(JSON.stringify({ app: app && { ...app, alive: alive(app.pid) }, browser: s && { pid: s.pid, alive: alive(s.pid), headed: s.headed }, base: x.base }));

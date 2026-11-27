@@ -32,6 +32,7 @@ interface CliModule {
   parseTarget(spec: string): Target;
   parseConfigBlock(source: string): Config;
   withPort(s: string, port: number): string;
+  parsePort(v: unknown): number;
 }
 
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
@@ -135,4 +136,10 @@ test("the shipped template's own config block is unfilled", () => {
 
 test("withPort substitutes every {port}", () => {
   assert.equal(cli.withPort("PORT={port} vite --port {port}", 3101), "PORT=3101 vite --port 3101");
+});
+
+test("parsePort accepts 1..65535 integers only", () => {
+  assert.equal(cli.parsePort("3101"), 3101);
+  assert.equal(cli.parsePort(3100), 3100);
+  for (const bad of ["0", "65536", "abc", "31.5", "", "-1", "3100x"]) assert.throws(() => cli.parsePort(bad), /port/, bad);
 });
