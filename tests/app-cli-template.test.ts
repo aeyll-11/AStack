@@ -33,6 +33,7 @@ interface CliModule {
   parseConfigBlock(source: string): Config;
   withPort(s: string, port: number): string;
   parsePort(v: unknown): number;
+  isOurProcess(ps: { command: string; started: string } | null, expect: { contains?: string[]; started?: string }): boolean;
 }
 
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
@@ -142,4 +143,24 @@ test("parsePort accepts 1..65535 integers only", () => {
   assert.equal(cli.parsePort("3101"), 3101);
   assert.equal(cli.parsePort(3100), 3100);
   for (const bad of ["0", "65536", "abc", "31.5", "", "-1", "3100x"]) assert.throws(() => cli.parsePort(bad), /port/, bad);
+});
+
+test("isOurProcess matches the daemon by its script path and __serve", () => {
+  const cli1 = "/repo/.claude/skills/verify-notes/scripts/notes-cli.mjs";
+  const ps = { command: `/usr/local/bin/node ${cli1} __serve --headed`, started: "Fri Nov 27 10:00:00 2026" };
+  assert.equal(cli.isOurProcess(ps, { contains: [cli1, "__serve"] }), true);
+  assert.equal(cli.isOurProcess({ ...ps, command: "/usr/bin/vim notes.txt" }, { contains: [cli1, "__serve"] }), false);
+  assert.equal(cli.isOurProcess({ ...ps, command: `node ${cli1} open /notes` }, { contains: [cli1, "__serve"] }), false);
+});
+
+test("isOurProcess matches the app by its recorded start time", () => {
+  const ps = { command: "node server.mjs", started: "Fri Nov 27 10:00:00 2026" };
+  assert.equal(cli.isOurProcess(ps, { started: "Fri Nov 27 10:00:00 2026" }), true);
+  assert.equal(cli.isOurProcess(ps, { started: "Fri Nov 27 09:59:59 2026" }), false);
+});
+
+test("isOurProcess never matches a gone process or an empty expectation", () => {
+  assert.equal(cli.isOurProcess(null, { started: "x" }), false);
+  assert.equal(cli.isOurProcess({ command: "node a", started: "x" }, {}), false);
+  assert.equal(cli.isOurProcess({ command: "node a", started: "" }, { started: "" }), false);
 });
