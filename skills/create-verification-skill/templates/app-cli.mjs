@@ -93,7 +93,7 @@ export function parseConfigBlock(source) {
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = process.env.APP_ROOT ?? resolve(dirname(SELF), "../../../..");
 const DIR = join(ROOT, ".astack", "verify");
-const F = { app: join(DIR, "app.json"), session: join(DIR, "session.json"), state: join(DIR, "state.json"), console: join(DIR, "console.log"),
+const F = { app: join(DIR, "app.json"), session: join(DIR, "session.json"), state: join(DIR, "state.json"), jar: join(DIR, "cookies.txt"), console: join(DIR, "console.log"),
   offset: join(DIR, "console.offset"), appLog: join(DIR, "app.log"), browserLog: join(DIR, "browser.log"), profile: join(DIR, "profile") };
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };
 const alive = (pid) => { if (!(pid > 0)) return false; try { process.kill(pid, 0); return true; } catch { return false; } };
@@ -125,6 +125,10 @@ async function status(url, opts = {}) {
 }
 function cookieHeader() {
   return (readJson(F.state)?.cookies ?? []).map((c) => `${c.name}=${c.value}`).join("; ");
+}
+function saveJar() {
+  const rows = (readJson(F.state)?.cookies ?? []).map((c) => [c.domain, c.domain.startsWith(".") ? "TRUE" : "FALSE", c.path, c.secure ? "TRUE" : "FALSE", Math.max(0, Math.floor(c.expires)), c.name, c.value].join("\t"));
+  writeFileSync(F.jar, `# Netscape HTTP Cookie File\n${rows.join("\n")}\n`);
 }
 function sh(cmd, env) { return spawnSync("sh", ["-c", cmd], { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...env } }).status; }
 
@@ -260,6 +264,7 @@ async function withPage(x, flags, fn) {
     const out = await fn(page, ctx);
     await settle(page, x.cfg);
     await ctx.storageState({ path: F.state });
+    saveJar();
     return out;
   } catch (e) {
     if (e instanceof Exit) throw e;
