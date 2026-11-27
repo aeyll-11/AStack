@@ -12,6 +12,8 @@ Each criterion ends as **PASS**, **FAIL**, or **INCONCLUSIVE**. Inconclusive is 
 
 ## 1. Gather the criteria and the evidence folder
 
+Run from the checkout that holds the change. Under the **astack** router that is the PR slot.
+
 ```bash
 repo=$(git rev-parse --show-toplevel)
 branch=$(git rev-parse --abbrev-ref HEAD | tr / -)

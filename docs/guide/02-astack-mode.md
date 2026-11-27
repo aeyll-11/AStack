@@ -16,7 +16,7 @@ The router is the entry point for non-trivial work. With `routerHook` on, a `Ses
 
 - The task list shows each playbook step.
 - The reply names each principle that shaped a decision and the choice it changed.
-- Spawned agents run in the background. Agents that edit code get their own worktree.
+- Each code task runs in one worktree slot on its PR branch, cut from trunk. Agents that edit code work in that slot, one at a time, and the lead pushes.
 
 ## Autonomy
 

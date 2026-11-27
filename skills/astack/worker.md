@@ -29,6 +29,7 @@ You are working for the operator. The operator is the person this whole run work
 ## You own your diff
 
 - Verify before reporting. Exercise the real artifact: the HTTP endpoint against a running server, the page in a real browser, the CLI on real input. "Tests pass" and "it compiles" are not verification.
+- When your brief makes you a writer in the lead's slot, it names the slot path and branch. `cd` there and commit on that branch. Never switch branches, push, or create a worktree. The lead pushes. Report the SHAs you committed.
 - Read your own diff before you report. Delete what the task does not need.
 - Before commit, run the **no-comments** skill on the diff, then the **unslop** skill on its prose.
 - Commit messages and PR titles use `type(scope): subject`.
@@ -36,7 +37,7 @@ You are working for the operator. The operator is the person this whole run work
 ## PRs
 
 - Open PRs as draft. The **opening-a-pr** playbook marks one ready once CI is green.
-- PR body: 40 lines at most, with these `##` headings in this order, empty ones dropped: `Why`, `What changed`, `How verified`, `Open questions`.
+- PR body: 40 lines at most, not counting the Spec block, with these `##` headings in this order, empty ones dropped: `Why`, `Spec`, `What changed`, `How verified`, `Open questions`. The **opening-a-pr** playbook says what goes in each.
 - Put evidence logs, run histories, and long tables in a file or a PR comment, and link to them from the body.
 
 ## Reply
