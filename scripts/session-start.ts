@@ -1,15 +1,17 @@
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { loadConfig } from "./lib/config.ts";
 import type { AStackConfig } from "./lib/config.ts";
 import { detectPacks } from "./lib/detect.ts";
 import type { Pack } from "./lib/detect.ts";
 
+const ROUTER = fileURLToPath(new URL("../skills/astack/SKILL.md", import.meta.url));
+
 export function buildContext(packs: Pack[], cfg: AStackConfig): string | null {
   const list = packs.length > 0 ? packs.join(", ") : "none";
   if (!cfg.routerHook) return packs.length > 0 ? `AStack stack packs: ${list}.` : null;
-  let text = `AStack is active. Route every non-trivial engineering task through the /astack:astack router: read its SKILL.md, pick the playbook, follow it. Active stack packs: ${list}.`;
+  let text = `AStack is active. Route every non-trivial engineering task through the /astack:astack router: Read ${ROUTER}, pick the playbook, follow it. Active stack packs: ${list}.`;
   if (!cfg.configured) text += " AStack is not configured yet: suggest /astack:setup-astack once.";
   return text;
 }

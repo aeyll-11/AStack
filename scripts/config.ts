@@ -55,7 +55,7 @@ export function main(argv: string[]): void {
       if (!a1) fail("usage: get <dotted.key>", 2);
       const v = getPath(loadConfig({ home, cwd }), a1);
       if (v === undefined) fail(`no such key "${a1}"`, 1);
-      console.log(JSON.stringify(v));
+      console.log(typeof v === "string" ? v : JSON.stringify(v));
       return;
     }
     case "set": {
