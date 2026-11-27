@@ -6,7 +6,7 @@
   "license": "MIT",
   "engines": { "node": ">=22.18" },
   "scripts": {
-    "test": "node --test \"tests/*.test.ts\"",
+    "test": "node --test \"tests/*.test.ts\" \"tests/watch-pr/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "lint": "node scripts/lint.ts"
   },
