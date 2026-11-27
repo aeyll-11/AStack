@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, basename, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export type Rule = "cursor-residue" | "cast-in-public" | "merge-ban" | "frontmatter" | "size";
 export interface LintIssue {
@@ -82,7 +82,7 @@ export function lintTree(root: string): LintIssue[] {
   return issues;
 }
 
-if (process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href) {
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = fileURLToPath(new URL("../", import.meta.url));
   const issues = lintTree(root);
   for (const i of issues) console.log(`${i.file}:${i.line} ${i.rule} ${i.message}`);
