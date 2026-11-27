@@ -1,6 +1,6 @@
 import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { createServer } from "node:net";
 import { pathToFileURL } from "node:url";
 import { loadConfig } from "./lib/config.ts";
@@ -41,7 +41,7 @@ function isIgnored(cwd: string, file: string): boolean {
 function ensureExcluded(repoRoot: string): void {
   if (isIgnored(repoRoot, ".worktrees")) return;
   const gitDir = run("git", ["rev-parse", "--git-common-dir"], repoRoot);
-  const infoDir = join(repoRoot, gitDir, "info");
+  const infoDir = resolve(repoRoot, gitDir, "info");
   mkdirSync(infoDir, { recursive: true });
   const file = join(infoDir, "exclude");
   const cur = existsSync(file) ? readFileSync(file, "utf8") : "";

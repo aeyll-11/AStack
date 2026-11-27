@@ -102,3 +102,14 @@ test("repoSlug parses ssh and https remotes; rejects non-github", () => {
 test("run throws with command and stderr", () => {
   assert.throws(() => run("git", ["nope-not-a-command"], tmpdir()), /git nope-not-a-command/);
 });
+
+test("exclude is written to the main repo when repoRoot is a linked worktree", async () => {
+  const repo = makeRepo(false);
+  const first = await createSlot({ repoRoot: repo, branch: "outer", slot: 0, basePort: 3100 });
+  const exclude = join(repo, ".git", "info", "exclude");
+  writeFileSync(exclude, "");
+  const inner = await createSlot({ repoRoot: first.path, branch: "inner", slot: 1, basePort: 3100 });
+  assert.match(readFileSafe(exclude), /\.worktrees\//);
+  assert.ok(existsSync(inner.path));
+  assert.ok(!existsSync(join(first.path, repo.slice(1))), "no stray absolute-path tree");
+});
