@@ -25,7 +25,9 @@ Run `node <plugin root>/scripts/detect.ts`. It prints a JSON array such as `["nu
 
 Models are per family: `opus`, `sonnet`, `haiku`, `fable`. The Agent tool takes families only, so say that once up front.
 
-For each role below, ask one question. Name the role and its job in one short line. Options are the four models. Put the role's current value first and mark it "(suggested)" when no user value is set, or "(current)" when one is. Read the current value with `config.ts model <role>`. The suggested defaults are what `config.ts model <role>` prints before the first run.
+First ask one gate question: "Pick a model for every role" or "Use suggested models for all roles". The second option writes the suggested model and effort for all 11 roles and skips the rest of this step. It is the only time you write a value the user did not choose per role.
+
+On the first option, for each role below ask one question. Name the role and its job in one short line. Options are the four models. Put the role's current value first and mark it "(suggested)" when no user value is set, or "(current)" when one is. Read the current value with `config.ts model <role>`. The suggested defaults are what `config.ts model <role>` prints before the first run.
 
 | Role | What it does |
 |---|---|
@@ -41,9 +43,15 @@ For each role below, ask one question. Name the role and its job in one short li
 | `review-api` | PR review seat for API and contract changes. |
 | `phoebe-owner` | The per-issue owner in the issue loop. |
 
-Batch the 11 roles as 4, 4, 3 questions. Offer "use suggested for all remaining" as the way to skip ahead. It must be a single explicit answer from the user.
+Batch the 11 roles as 4, 4, 3 questions. All 4 options of each question are model families, so say in the question text that typing "use suggested for the rest" under "Other" accepts the suggested model and effort for every remaining role. Accept that only as explicit free text from the user.
 
-Then ask effort. Offer one question first: "keep suggested efforts" or "set effort per role". If the user wants per-role effort, ask each role in batches of up to 4 with options `low`, `medium`, `high`, `xhigh`. Effort `max` is available through "Other".
+Then ask effort. Offer one question first: "keep current efforts" or "set effort per role". If the user wants per-role effort, ask each role in batches of up to 4 with options `low`, `medium`, `high`, `xhigh`. Effort `max` is available through "Other".
+
+Effort rules:
+
+- Write a role's effort only when the user picked one for that role.
+- On a re-run with "keep current efforts", write each role's stored effort back (read it with `config.ts model <role>`), or leave `effort` out. Never write the suggested value over a stored one.
+- On a first run (no user value stored) with "keep", say plainly that the suggested efforts will be stored. Treat the user's answer as that explicit choice.
 
 Write each role once you have both answers:
 
@@ -83,7 +91,9 @@ Explain: the router hook adds a `SessionStart` pointer so Claude routes every no
 
 ## 7. Permission allowlist
 
-Target the project's `.claude/settings.json`, key `permissions.allow`. The entries:
+Target the project's `.claude/settings.json`, keys `permissions.allow` and `permissions.deny`. Read the existing file first. If it does not parse as JSON, stop, report the parse error, and write nothing. Never overwrite it.
+
+Broad entries (default set):
 
 - `Bash(git:*)`
 - `Bash(gh:*)`
@@ -91,7 +101,15 @@ Target the project's `.claude/settings.json`, key `permissions.allow`. The entri
 - `Bash(node:*)`
 - `Bash(npx playwright:*)`
 
-Read the existing file first. Merge into it and never drop existing entries or other keys. Skip entries already present. Show the exact JSON diff of what you will add, then confirm with AskUserQuestion (write, or skip). Write the file only on a yes. Create `.claude/` if it is missing.
+State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes `gh pr merge`, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` (the plugin's own scripts, with the real absolute path). The user picks broad or narrow.
+
+In every case also add these to `permissions.deny`, because AStack never merges and never force-pushes:
+
+- `Bash(gh pr merge:*)`
+- `Bash(git push --force:*)`
+- `Bash(git push -f:*)`
+
+Merge into the existing file and never drop existing entries or other keys. Skip entries already present. Show the exact JSON diff of what you will add, then confirm with AskUserQuestion (write, or skip). Write only on a yes. Create `.claude/` if it is missing.
 
 ## 8. Competing plugins
 
