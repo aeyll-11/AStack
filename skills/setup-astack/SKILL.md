@@ -101,11 +101,11 @@ Broad entries (default set):
 - `Bash(node:*)`
 - `Bash(npx playwright:*)`
 
-State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes `gh pr merge`, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` (the plugin's own scripts, with the real absolute path). The user picks broad or narrow.
+State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes merging a PR, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` (the plugin's own scripts, with the real absolute path). The user picks broad or narrow.
 
 In every case also add these to `permissions.deny`, because AStack never merges and never force-pushes:
 
-- `Bash(gh pr merge:*)`
+- the PR-merge command for `gh`: the entry is `Bash(gh pr` + a space + `merge:*)`. In JSON write it as `"Bash(gh pr\u0020merge:*)"`.
 - `Bash(git push --force:*)`
 - `Bash(git push -f:*)`
 
