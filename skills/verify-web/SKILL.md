@@ -37,8 +37,8 @@ Shell variables do not survive between Bash calls. Use the printed paths and the
 
 Browser criteria are driven only through the project's own `<app>-cli`, never through a script you write for this run.
 
-- Find `.claude/skills/verify-*/SKILL.md` in the repo. With several, pick the one whose description names the surface you changed. Read it and its `features/README.md`. Its CLI is `node .claude/skills/verify-<app>/scripts/<app>-cli.mjs`; below it is `cli`.
-- With none, run the **create-verification-skill** skill first, then come back here and use the CLI it generated.
+- Find `.claude/skills/verify-*/SKILL.md` in the slot; `worktree.ts create` copies untracked ones from the repo root. With several, pick the one whose description names the surface you changed. Read it and its `features/README.md`. Its CLI is `node .claude/skills/verify-<app>/scripts/<app>-cli.mjs`; below it is `cli`.
+- With none, run the **create-verification-skill** skill first, then come back here and use the CLI it generated. A skill generated in the slot during a feature task is committed with that PR only if the user asked; otherwise it stays untracked and the lead copies it back to the repo root.
 - If the project has no Playwright and the user declines adding it, the generated CLI still launches, seeds, and checks the app, so `[http]` criteria run. Every `[browser]` criterion is INCONCLUSIVE with "no Playwright in the project". Never PASS.
 
 For each criterion, find the matching feature file in the map. Its `Ownership:` names the source files to read, its `Selectors:` the handles, its recipe the CLI calls. A criterion the map does not cover is still driven through the CLI; note the gap so the **maintain-verification-skill** skill adds it.

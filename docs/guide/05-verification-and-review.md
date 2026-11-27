@@ -41,7 +41,7 @@ Without Playwright in the project, browser criteria stay inconclusive.
 /astack:maintain-verification-skill
 ```
 
-It reads the source for every feature, checks `Ownership:` paths and `Selectors:` handles, drives every feature live through the CLI, and opens at most one PR of proven fixes to the map or the CLI. It needs the app running locally, so schedule it on your machine. `/astack:setup-astack` offers `/loop 24h /astack:maintain-verification-skill` in an open session, or shows a crontab line for you to add.
+It reads the source for every feature, checks `Ownership:` paths and `Selectors:` handles, drives every feature live through the CLI, and opens at most one PR of proven fixes to the map or the CLI. It needs the app running locally, so schedule it on your machine. `/astack:setup-astack` offers `/loop 24h /astack:maintain-verification-skill verify-<app>` in an open session, or shows a crontab line for you to add.
 
 ## Self-review
 
