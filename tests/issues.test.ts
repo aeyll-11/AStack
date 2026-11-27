@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildGhListArgs, claim, parseGhIssues, release } from "../scripts/issues.ts";
+import { buildGhListArgs, claim, parseGhIssues, prStatus, release, summarizeChecks } from "../scripts/issues.ts";
 
 const SCRIPT = fileURLToPath(new URL("../scripts/issues.ts", import.meta.url));
 const dirs: string[] = [];
@@ -144,6 +144,71 @@ esac
   assert.equal(calls.filter((c) => c === EDIT).length, 2);
 });
 
+test("claim skips an issue AStack already holds, even when assigned to me", () => {
+  const gh = fakeGh({
+    [VIEW]: '{"state":"OPEN","assignees":[{"login":"me"}],"labels":[{"name":"astack:in-progress"}]}',
+    "api user --jq .login": "me",
+  });
+  assert.deepEqual(withGh(gh.bin, () => claim(7, tmp())), { result: "skipped", reason: "in progress" });
+  assert.ok(!gh.calls().some((c) => c.startsWith("issue edit")));
+});
+
+test("claim skips an issue waiting on an answer", () => {
+  const gh = fakeGh({ [VIEW]: '{"state":"OPEN","assignees":[],"labels":[{"name":"astack:needs-info"}]}' });
+  assert.deepEqual(withGh(gh.bin, () => claim(7, tmp())), { result: "skipped", reason: "needs info" });
+});
+
+test("release --needs-info swaps in the needs-info label, creating it when missing", () => {
+  const d = tmp();
+  const flag = join(d, "label-made");
+  const edit = "issue edit 7 --remove-label astack:in-progress --remove-assignee @me --add-label astack:needs-info";
+  const bin = join(d, "gh");
+  writeFileSync(
+    bin,
+    `#!/bin/sh
+printf '%s\n' "$*" >> '${d}/calls.log'
+case "$*" in
+  'label create'*) touch '${flag}' ;;
+  '${edit}') [ -f '${flag}' ] || { echo "could not add label: 'astack:needs-info' not found" >&2; exit 1; } ;;
+esac
+`,
+  );
+  chmodSync(bin, 0o755);
+  withGh(bin, () => release(7, d, { needsInfo: true }));
+  const calls = readFileSync(join(d, "calls.log"), "utf8").trim().split("\n");
+  assert.equal(calls.filter((c) => c.startsWith("label create astack:needs-info")).length, 1);
+  assert.equal(calls.filter((c) => c === edit).length, 2);
+});
+
+test("summarizeChecks reduces a rollup to one CI state", () => {
+  assert.equal(summarizeChecks([]), "none");
+  assert.equal(summarizeChecks([{ status: "COMPLETED", conclusion: "SUCCESS" }, { state: "SUCCESS" }]), "green");
+  assert.equal(summarizeChecks([{ status: "IN_PROGRESS" }, { status: "COMPLETED", conclusion: "SUCCESS" }]), "pending");
+  assert.equal(summarizeChecks([{ status: "IN_PROGRESS" }, { status: "COMPLETED", conclusion: "FAILURE" }]), "red");
+  assert.equal(summarizeChecks([{ state: "PENDING" }]), "pending");
+});
+
+const PR_LIST = "pr list --head astack/12-dark-mode --state all --json number,url,isDraft,state,statusCheckRollup";
+
+test("prStatus reads the branch's PR and its CI", () => {
+  const gh = fakeGh({
+    [PR_LIST]:
+      '[{"number":48,"url":"https://github.com/acme/web/pull/48","isDraft":true,"state":"OPEN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"FAILURE"}]}]',
+  });
+  assert.deepEqual(withGh(gh.bin, () => prStatus("astack/12-dark-mode", tmp())), {
+    number: 48,
+    url: "https://github.com/acme/web/pull/48",
+    draft: true,
+    state: "OPEN",
+    ci: "red",
+  });
+});
+
+test("prStatus is null before the owner opens a PR", () => {
+  const gh = fakeGh({ [PR_LIST]: "[]" });
+  assert.equal(withGh(gh.bin, () => prStatus("astack/12-dark-mode", tmp())), null);
+});
+
 test("release removes the label and the assignee", () => {
   const gh = fakeGh({});
   withGh(gh.bin, () => release(7, tmp()));
@@ -179,11 +244,12 @@ test("list exits 2 when gh is not logged in", () => {
   assert.match(r.stderr, /not authenticated/);
 });
 
-test("list prints one JSON line and drops issues already in progress", () => {
+test("list prints one JSON line and drops issues in progress or waiting on an answer", () => {
   const args = buildGhListArgs({ source: "github" }).join(" ");
   const out = JSON.stringify([
     { number: 1, title: "Free", body: "b", url: "u1", labels: [], assignees: [] },
     { number: 2, title: "Taken", body: "b", url: "u2", labels: [{ name: "astack:in-progress" }], assignees: [] },
+    { number: 3, title: "Asked", body: "b", url: "u3", labels: [{ name: "astack:needs-info" }], assignees: [] },
   ]);
   const gh = fakeGh({ [args]: out });
   const r = cli(["list"], githubRepo(), gh.bin);
