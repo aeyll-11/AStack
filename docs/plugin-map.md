@@ -52,7 +52,7 @@ Every AStack plugin feature, how it is proved, and the command that proves it. T
 | detect (stack packs) | `scripts/detect.ts`, `scripts/lib/detect.ts`, `tests/fixtures/repos/*` | unit: `tests/detect.test.ts`; smoke: each fixture prints its expected array | `npm test`; `npm run verify` |
 | session-start | `scripts/session-start.ts` | unit: `tests/session-start.test.ts`; smoke: stdin JSON gives `hookSpecificOutput` with the router path | `npm test`; `npm run verify` |
 | lint | `scripts/lint.ts` | unit: `tests/lint.test.ts`; smoke: runs clean on the repo | `npm test`; `npm run lint` |
-| worktree (`create`, `remove`) | `scripts/worktree.ts`, `scripts/lib/git.ts` | unit: `tests/worktree.test.ts`; smoke: create and remove in a temp repo | `npm test`; `npm run verify` |
+| worktree (`create`, `remove`; copies untracked `.env*`, `.astack/config.json`, `.claude/skills/verify-*/`) | `scripts/worktree.ts`, `scripts/lib/git.ts` | unit: `tests/worktree.test.ts`; smoke: create and remove in a temp repo | `npm test`; `npm run verify` |
 | evidence (`push --pr <n> <files...>`) | `scripts/evidence.ts` | unit: `tests/evidence.test.ts`; smoke: no args gives a usage error. e2e: a real push | `npm test`; `npm run verify` |
 | issues (`list`, `claim`, `comment`, `release`, `pr-status`) | `scripts/issues.ts` | unit: `tests/issues.test.ts`; smoke: `list` without `gh` exits 2 with "GitHub unavailable". e2e: live claim and comment | `npm test`; `npm run verify` |
 | watch-pr | `scripts/watch-pr/*.ts` | unit: `tests/watch-pr/*.test.ts`; smoke: `1 --once --json` without `gh` exits 2. e2e: a live PR | `npm test`; `npm run verify` |
