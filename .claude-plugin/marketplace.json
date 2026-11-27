@@ -1,0 +1,12 @@
+{
+  "name": "astack",
+  "description": "AStack plugin marketplace.",
+  "owner": { "name": "Idriss" },
+  "plugins": [
+    {
+      "name": "astack",
+      "source": "./",
+      "description": "Rigorous JS/TS web engineering workflows: spec or issue to a verified, self-reviewed, green PR."
+    }
+  ]
+}
