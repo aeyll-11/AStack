@@ -37,7 +37,7 @@ Where the input is silent, pick the reading that best fits the code and the prod
 
 ## 4. Save and return
 
-Save the block to `<repo>/.astack/spec/<branch>.md`, where `<repo>` is `git rev-parse --show-toplevel` and `<branch>` is the current branch with each `/` replaced by `-`. Keep it out of git through the shared exclude file, never `.gitignore`:
+Save the block to `<repo>/.astack/spec/<branch>.md`, where `<repo>` is `git rev-parse --show-toplevel` and `<branch>` is the current branch with each `/` replaced by `-`. Under the **astack** router, run this from the PR slot, so `<branch>` is the PR branch. Keep it out of git through the shared exclude file, never `.gitignore`:
 
 ```bash
 repo=$(git rev-parse --show-toplevel)

@@ -20,7 +20,7 @@
    5. Do it when they're not looking.
    6. Do it concurrently.
    7. Do it cheaper.
-5. **Fix.** Plan from the artifact. If it crosses a function boundary, run the **architect** skill first. A step that touches framework or runtime code reads the **pack-<p>** skill for each active pack. Delegate to `astack:xiangli-yao` with the `implementer` role and `isolation: "worktree"`. Review the diff. Apply **principle-sequence-verifiable-units**, verifying each attempt before the next.
+5. **Fix.** Plan from the artifact. If it crosses a function boundary, run the **architect** skill first. A step that touches framework or runtime code reads the **pack-<p>** skill for each active pack. Delegate to `astack:xiangli-yao` with the `implementer` role in the PR slot, per the router's writer rule. Review the diff. Apply **principle-sequence-verifiable-units**, verifying each attempt before the next.
 6. **Re-measure** with the same tool, same conditions, same run count. Diff the before and after artifacts. "Inconclusive" or wrong-surface is not a pass. Flag it.
 7. Cite the baseline, post-fix number, and artifacts in the PR's `## How verified`. Run the **opening-a-pr** playbook.
 

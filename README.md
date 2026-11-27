@@ -25,8 +25,8 @@ Not sure which skill or playbook fits? Run `/astack:astack-help <question>`.
 **Spec to PR.** One task, one PR. The `feature` playbook runs it. A bug runs `verina`, a slow page runs `perf`, and so on.
 
 ```
-spec -> architect -> implement -> test -> verify (real app) -> open draft PR
-  -> self-review -> fix findings -> CI watch -> ready PR + human notified
+PR slot -> spec -> architect -> implement (with tests) -> verify (real app)
+  -> open draft PR -> self-review and fixes -> CI watch -> ready PR + human notified
 ```
 
 **Phoebe, the issue loop.** A queue of GitHub or Linear issues. Phoebe claims each issue, gives it its own owner agent in its own worktree, and runs the feature pipeline per issue.
