@@ -22,7 +22,7 @@ Only edit the verification skill's own directory (its SKILL.md, features/, and i
 
 ## Pass
 
-0. **Locate the target.** Find the verification skill to maintain: the project-local skill whose body has launch/drive sections and a feature map (usually `.claude/skills/verify-*/`). Several candidates → ask which one with `AskUserQuestion`; none → stop and point at `/astack:create-verification-skill` instead of inventing a target.
+0. **Locate the target.** An argument naming a skill (`/astack:maintain-verification-skill verify-<app>`) picks `.claude/skills/<name>/`; use it and never ask. If it does not exist, the outcome is `blocked`. With no argument, find the verification skill to maintain: the project-local skill whose body has launch/drive sections and a feature map (usually `.claude/skills/verify-*/`). Several candidates → ask which one with `AskUserQuestion`, or, when `AskUserQuestion` is unavailable (a headless `claude -p` run), report `blocked` with the candidate names instead of asking; none → stop and point at `/astack:create-verification-skill` instead of inventing a target.
 
 1. **Index hygiene.** Read the feature map README and glob its sibling files. Fix missing, extra, duplicate, or dead entries. Lightweight; no generated inventory.
 

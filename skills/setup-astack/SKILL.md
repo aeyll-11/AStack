@@ -89,16 +89,16 @@ Skip when the project has no dev server.
 
 Look for `.claude/skills/verify-*/SKILL.md` in the repo. With none, skip the schedule. Offer to run the **create-verification-skill** skill now instead, and run it on a yes.
 
-With one, explain: the **maintain-verification-skill** skill keeps the feature map and the `<app>-cli` driver honest as the app changes. It launches and drives the app locally, so it runs on this machine, not in the cloud. Ask which, with AskUserQuestion:
+With one or more, explain: the **maintain-verification-skill** skill keeps the feature map and the `<app>-cli` driver honest as the app changes. It launches and drives the app locally, so it runs on this machine, not in the cloud. Ask which, with AskUserQuestion:
 
-- **Loop in an open session.** Tell the user to run `/loop 24h /astack:maintain-verification-skill` in a session they keep open in this repo.
+- **Loop in an open session.** Tell the user to run `/loop 24h /astack:maintain-verification-skill verify-<app>` in a session they keep open in this repo.
 - **Crontab.** Show this line with the real absolute paths, for the user to add with `crontab -e`:
 
   ```
-  0 7 * * * cd <repo root> && claude -p "/astack:maintain-verification-skill" --plugin-dir <plugin root> >> .astack/verify/maintain.log 2>&1
+  0 7 * * * cd <repo root> && mkdir -p .astack/verify && claude -p "/astack:maintain-verification-skill verify-<app>" --plugin-dir <plugin root> >> .astack/verify/maintain.log 2>&1
   ```
 
-  Say that a headless run needs the allowlist from step 8. **Never install it yourself.**
+  Use the real skill folder name for `verify-<app>`, one line per verify skill, so an unattended run never stops to ask which one. Say that a headless run needs the allowlist from step 8. **Never install it yourself.**
 - **Skip.**
 
 ## 7. Router hook
