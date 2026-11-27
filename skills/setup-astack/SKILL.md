@@ -85,11 +85,27 @@ node <plugin root>/scripts/config.ts set devServer '{"command":"npm run dev","ba
 
 Skip when the project has no dev server.
 
-## 6. Router hook
+## 6. Daily verification maintenance
+
+Look for `.claude/skills/verify-*/SKILL.md` in the repo. With none, skip the schedule. Offer to run the **create-verification-skill** skill now instead, and run it on a yes.
+
+With one, explain: the **maintain-verification-skill** skill keeps the feature map and the `<app>-cli` driver honest as the app changes. It launches and drives the app locally, so it runs on this machine, not in the cloud. Ask which, with AskUserQuestion:
+
+- **Loop in an open session.** Tell the user to run `/loop 24h /astack:maintain-verification-skill` in a session they keep open in this repo.
+- **Crontab.** Show this line with the real absolute paths, for the user to add with `crontab -e`:
+
+  ```
+  0 7 * * * cd <repo root> && claude -p "/astack:maintain-verification-skill" --plugin-dir <plugin root> >> .astack/verify/maintain.log 2>&1
+  ```
+
+  Say that a headless run needs the allowlist from step 8. **Never install it yourself.**
+- **Skip.**
+
+## 7. Router hook
 
 Explain: the router hook adds a `SessionStart` pointer so Claude routes every non-trivial task through `/astack:astack`. Ask on or off, then `set routerHook true` or `false`.
 
-## 7. Permission allowlist
+## 8. Permission allowlist
 
 Target the project's `.claude/settings.json`, keys `permissions.allow` and `permissions.deny`. Read the existing file first. If it does not parse as JSON, stop, report the parse error, and write nothing. Never overwrite it.
 
@@ -111,10 +127,10 @@ In every case also add these to `permissions.deny`, because AStack never merges 
 
 Merge into the existing file and never drop existing entries or other keys. Skip entries already present. Show the exact JSON diff of what you will add, then confirm with AskUserQuestion (write, or skip). Write only on a yes. Create `.claude/` if it is missing.
 
-## 8. Competing plugins
+## 9. Competing plugins
 
 Run `claude plugin list`. Name any enabled workflow plugin whose process skills auto-trigger, such as superpowers, agent-skills, or similar. They compete with AStack's router. For each, give the command `claude plugin disable <name>`. **Never run it yourself.** The user decides. If the command fails or lists none, say so in a line.
 
-## 9. Finish
+## 10. Finish
 
 Run `node <plugin root>/scripts/config.ts set configured true`. Print a short summary of what you wrote and where (user file, project file, settings file), and point to `/astack:astack <task>` as the way to start.
