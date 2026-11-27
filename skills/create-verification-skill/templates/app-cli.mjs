@@ -70,6 +70,15 @@ export function parsePort(v) {
   return n;
 }
 
+// Pid reuse guard: a recorded pid is ours only if the live process still matches what we recorded.
+export function isOurProcess(ps, expect) {
+  if (!ps) return false;
+  const checks = [];
+  if (expect.contains) checks.push(expect.contains.every((n) => ps.command.includes(n)));
+  if (expect.started !== undefined) checks.push(!!ps.started && ps.started === expect.started);
+  return checks.length > 0 && checks.every(Boolean);
+}
+
 export function parseConfigBlock(source) {
   const m = /\/\* astack-config\n([\s\S]*?)\nastack-config \*\//.exec(source);
   if (!m) throw new Error("no astack-config block found");
@@ -130,6 +139,18 @@ function killTree(pid, sig, kids = childrenOf(pid)) {
   for (const p of [pid, ...kids]) { try { process.kill(-p, sig); } catch { try { process.kill(p, sig); } catch {} } }
 }
 const childrenOf = (pid) => spawnSync("pgrep", ["-P", String(pid)], { encoding: "utf8" }).stdout.split("\n").filter(Boolean).map(Number);
+function psInfo(pid) {
+  if (!(pid > 0)) return null;
+  const col = (c) => spawnSync("ps", ["-ww", "-o", `${c}=`, "-p", String(pid)], { encoding: "utf8" }).stdout.trim();
+  const command = col("command");
+  return command ? { command, started: col("lstart") } : null;
+}
+const ourDaemon = (s) => !!s && isOurProcess(psInfo(s.pid), { contains: [SELF, "__serve"] });
+function ourApp(app) {
+  if (!app) return false;
+  if (app.started && isOurProcess(psInfo(app.pid), { started: app.started })) return true;
+  return listeners(app.port).some((p) => pgid(p) === app.pid);
+}
 const pgid = (pid) => Number(spawnSync("ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }).stdout.trim());
 
 async function status(url, opts = {}) {
@@ -146,14 +167,14 @@ function sh(cmd, env) { return spawnSync("sh", ["-c", cmd], { cwd: ROOT, stdio: 
 
 async function launch(x) {
   const prev = readJson(F.app);
-  if (prev && alive(prev.pid)) throw new Exit(1, `app already running pid=${prev.pid} port=${prev.port}. Run cleanup first`);
+  if (prev && ourApp(prev)) throw new Exit(1, `app already running pid=${prev.pid} port=${prev.port}. Run cleanup first`);
   const taken = listeners(x.port);
   if (taken.length) throw new Exit(1, `port ${x.port} is taken by pid ${taken.join(",")} (not ours). Pass --port <free port>`);
   const log = openSync(F.appLog, "a");
   const child = spawn("sh", ["-c", withPort(x.cfg.launch, x.port)], { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: { ...process.env, PORT: String(x.port) } });
   child.unref();
   closeSync(log);
-  writeFileSync(F.app, JSON.stringify({ pid: child.pid, port: x.port }));
+  writeFileSync(F.app, JSON.stringify({ pid: child.pid, port: x.port, started: psInfo(child.pid)?.started ?? "" }));
   const until = Date.now() + x.cfg.readyTimeoutMs;
   while (Date.now() < until) {
     const s = await status(x.base + x.cfg.readyPath);
@@ -168,7 +189,8 @@ async function launch(x) {
 
 async function killApp(x) {
   const app = readJson(F.app);
-  if (app?.pid > 0) {
+  if (app && !ourApp(app)) say(`stale app record pid=${app.pid}: not ours any more, signalling nothing`);
+  else if (app) {
     try { process.kill(-app.pid, "SIGTERM"); } catch {}
     for (let i = 0; i < 20 && listeners(app.port).length; i++) await sleep(250);
     try { process.kill(-app.pid, "SIGKILL"); } catch {}
@@ -181,7 +203,7 @@ async function doctor(x) {
   const fails = [];
   const check = (ok, name, detail) => { say(`${ok ? "ok" : "fail"} ${name} ${detail}`); if (!ok) fails.push(name); };
   const app = readJson(F.app);
-  check(!!app && alive(app.pid), "process", app ? `pid=${app.pid}` : "not launched by this CLI");
+  check(ourApp(app), "process", app ? `pid=${app.pid}` : "not launched by this CLI");
   const owners = listeners(x.port);
   check(!!app && owners.length > 0 && owners.every((p) => p === app.pid || pgid(p) === app.pid), "port", `${x.port} listeners=${owners.join(",") || "none"}`);
   const s = await status(x.base + x.cfg.readyPath);
@@ -208,6 +230,8 @@ async function serve(flags) {
   ctx.pages().forEach(hook);
   ctx.on("page", hook);
   ctx.on("close", () => process.exit(1));
+  process.on("exit", () => { if (readJson(F.session)?.pid === process.pid) rmSync(F.session, { force: true }); });
+  for (const ev of ["uncaughtException", "unhandledRejection"]) process.on(ev, (e) => { console.error(e); process.exit(1); });
   const ctl = createServer(async (req, res) => {
     const u = new URL(req.url, "http://x");
     try {
@@ -227,7 +251,8 @@ async function serve(flags) {
 
 async function startBrowser(flags) {
   const s = readJson(F.session);
-  if (s && alive(s.pid)) return say(`ok start pid=${s.pid} (already running)`);
+  if (ourDaemon(s) && s.wsEndpoint) return say(`ok start pid=${s.pid} (already running)`);
+  if (ourDaemon(s)) throw new Exit(1, `browser pid=${s.pid} is still starting or wedged. Run stop, then start`);
   playwright();
   rmSync(F.session, { force: true });
   const log = openSync(F.browserLog, "a");
@@ -240,7 +265,7 @@ async function startBrowser(flags) {
     if (n?.wsEndpoint) return say(`ok start pid=${n.pid} headed=${n.headed}`);
     await sleep(250);
   }
-  killTree(child.pid, "SIGKILL");
+  if (ourDaemon({ pid: child.pid })) killTree(child.pid, "SIGKILL");
   rmSync(F.session, { force: true });
   const tail = readFileSync(F.browserLog, "utf8").split("\n").slice(-20).join("\n");
   throw new Exit(tail.includes("Executable doesn't exist") ? 3 : 1, `browser did not start. Try: (cd ${ROOT} && npx playwright install chromium)\n${tail}`);
@@ -248,7 +273,11 @@ async function startBrowser(flags) {
 
 async function stopBrowser() {
   const s = readJson(F.session);
-  if (s?.pid > 0) {
+  if (s && !ourDaemon(s)) {
+    rmSync(F.session, { force: true });
+    return say(`ok stop (stale session pid=${s.pid} is not our browser; signalled nothing)`);
+  }
+  if (s) {
     const kids = childrenOf(s.pid);
     killTree(s.pid, "SIGTERM", kids);
     for (let i = 0; i < 20 && [s.pid, ...kids].some(alive); i++) await sleep(250);
@@ -277,7 +306,7 @@ async function snapshotOf(page) {
 
 async function withPage(x, flags, fn) {
   const chromium = playwright();
-  if (!alive(readJson(F.session)?.pid)) await startBrowser(flags);
+  if (!ourDaemon(readJson(F.session))) await startBrowser(flags);
   const cli = `node ${SELF}`;
   const last = existsSync(F.lastUrl) ? ` Last URL: ${readFileSync(F.lastUrl, "utf8")}` : "";
   const browser = await chromium.connectOverCDP(readJson(F.session)?.wsEndpoint ?? "").catch(() => {
@@ -320,7 +349,7 @@ async function open(page, x, route) {
 
 async function ctlCall(path) {
   const s = readJson(F.session);
-  if (!s || !alive(s.pid)) throw new Exit(1, "no browser running. Run start");
+  if (!ourDaemon(s)) throw new Exit(1, "no browser running. Run start");
   return new Promise((ok, bad) => request({ host: "127.0.0.1", port: s.ctl, path, method: "POST" }, (res) => {
     let body = "";
     res.on("data", (d) => (body += d));
@@ -397,7 +426,7 @@ async function main(argv) {
     case "cleanup": await stopBrowser(); await killApp(x); return say(`ok cleanup kept=${DIR}/console.log and your evidence`);
     case "status": {
       const app = readJson(F.app), s = readJson(F.session);
-      return say(JSON.stringify({ app: app && { ...app, alive: alive(app.pid) }, browser: s && { pid: s.pid, alive: alive(s.pid), headed: s.headed }, base: x.base }));
+      return say(JSON.stringify({ app: app && { ...app, alive: ourApp(app) }, browser: s && { pid: s.pid, alive: ourDaemon(s), headed: s.headed }, base: x.base }));
     }
     default: throw new Exit(2, `unknown command "${cmd}". Run help`);
   }
