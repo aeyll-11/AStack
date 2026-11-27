@@ -406,6 +406,7 @@ export interface GitHubReader {
 export type SummaryState = "green" | "red" | "pending" | "conflict" | "closed";
 export interface PrSummary {
   readonly state: SummaryState;
+  readonly head: string | null;
   readonly failing: readonly { readonly name: string; readonly link: string }[];
   readonly unresolvedThreads: number;
 }

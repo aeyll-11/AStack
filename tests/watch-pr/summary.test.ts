@@ -49,7 +49,7 @@ describe("--once --json summary", () => {
         fastPath: { kind: "checks", checks: [passingCheck("build")] },
         commitRollups: [{ oid: "head", state: "SUCCESS" }],
       }),
-      { state: "green", failing: [], unresolvedThreads: 0 }
+      { state: "green", head: "head", failing: [], unresolvedThreads: 0 }
     );
   });
 
@@ -69,6 +69,7 @@ describe("--once --json summary", () => {
       }),
       {
         state: "red",
+        head: "head",
         failing: [{ name: "lint", link: "https://github.com/owner/repo/actions/runs/9/job/1" }],
         unresolvedThreads: 0,
       }
@@ -98,7 +99,7 @@ describe("--once --json summary", () => {
   it("PENDING and EXPECTED are pending", async () => {
     assert.deepEqual(
       await read({ fastPath: { kind: "checks", checks: [passingCheck(), pendingCheck("e2e")] } }),
-      { state: "pending", failing: [], unresolvedThreads: 0 }
+      { state: "pending", head: "head", failing: [], unresolvedThreads: 0 }
     );
     assert.equal(
       (await read({
@@ -109,9 +110,27 @@ describe("--once --json summary", () => {
     );
   });
 
+  it("reports the head the summary was read from", async () => {
+    assert.equal((await read({ facts: { headRefOid: "abc123" }, commitRollups: [{ oid: "abc123", state: "SUCCESS" }] })).head, "abc123");
+    assert.equal((await read({ facts: { headRefOid: null } })).head, null);
+  });
+
+  it("UNKNOWN mergeable is pending, not green", async () => {
+    assert.equal((await read({ facts: { mergeable: "UNKNOWN", mergeStateStatus: "UNKNOWN" } })).state, "pending");
+  });
+
+  it("a head with no rollup yet is never green", async () => {
+    // Just after a push: gh pr checks still shows the old head passing.
+    const stale = { facts: { headRefOid: "new" }, commitRollups: [{ oid: "old", state: "SUCCESS" as const }] };
+    assert.equal((await read(stale)).state, "pending");
+    assert.equal((await read({ ...stale, commitRollups: [{ oid: "new", state: null }] })).state, "pending");
+    assert.equal((await read({ facts: { headRefOid: null } })).state, "pending");
+  });
+
   it("CLOSED and MERGED are closed", async () => {
     assert.deepEqual(await read({ facts: { state: "CLOSED" } }), {
       state: "closed",
+      head: "head",
       failing: [],
       unresolvedThreads: 0,
     });
@@ -124,6 +143,7 @@ describe("--once --json summary", () => {
   it("counts unresolved review threads without blocking green", async () => {
     assert.deepEqual(await read({ threads: [thread, { ...thread, id: "t2" }] }), {
       state: "green",
+      head: "head",
       failing: [],
       unresolvedThreads: 2,
     });

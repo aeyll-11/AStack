@@ -49,7 +49,7 @@ Options:
   --max-query-errors <count>  consecutive query-error budget (default: 5)
   --status-only, --once       read once, print one status, and exit
   --json                      read one PR once and print
-                              {"state","failing":[{"name","link"}],"unresolvedThreads"}
+                              {"state","head","failing":[{"name","link"}],"unresolvedThreads"}
   --allow-draft               do not treat a draft as a merge gate
   --pretty                    render human text instead of JSON
   -h, --help                  show this help

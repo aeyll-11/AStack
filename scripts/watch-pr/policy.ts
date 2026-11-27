@@ -262,19 +262,26 @@ export function selectTierMajorStackDecision(
     throw new Error("stack has no classified decision");
   return { kind: "clear", prs };
 }
+// Right after a push GitHub can still report the old head's checks, with
+// mergeable UNKNOWN and no rollup on the new head. None of that is green.
+function cleanState(rollup: T.RollupState): T.SummaryState {
+  if (rollup === "SUCCESS") return "green";
+  return rollup === "FAILURE" || rollup === "ERROR" ? "red" : "pending";
+}
 export function summarize(row: T.PrSnapshot): T.PrSummary {
+  const head = row.facts.headRefOid;
   if (row.kind !== "open")
-    return { state: "closed", failing: [], unresolvedThreads: 0 };
+    return { state: "closed", head, failing: [], unresolvedThreads: 0 };
   const failing = row.ci.failed.map(({ name, link }) => ({ name, link }));
   const state: T.SummaryState =
     conflictBlocker(row) !== null
       ? "conflict"
       : row.ci.kind === "ci-failing" || row.ci.kind === "ci-github-rejected"
         ? "red"
-        : row.ci.kind === "ci-pending"
+        : row.ci.kind === "ci-pending" || row.facts.mergeable === "UNKNOWN"
           ? "pending"
-          : "green";
-  return { state, failing, unresolvedThreads: row.threads.length };
+          : cleanState(row.ci.github.headRollupState);
+  return { state, head, failing, unresolvedThreads: row.threads.length };
 }
 export const queryBackoffSeconds = (
   interval: number,
