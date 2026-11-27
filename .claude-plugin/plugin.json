@@ -1,0 +1,7 @@
+{
+  "name": "astack",
+  "version": "0.1.0",
+  "description": "Rigorous JS/TS web engineering workflows: spec or issue to a verified, self-reviewed, green PR.",
+  "author": { "name": "Idriss" },
+  "license": "MIT"
+}
