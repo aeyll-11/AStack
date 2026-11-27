@@ -7,6 +7,8 @@ export class GitHubUnavailable extends Error {
   }
 }
 
+export const ghBin = (): string => process.env.ASTACK_GH ?? "gh";
+
 export function run(cmd: string, args: string[], cwd: string): string {
   try {
     return execFileSync(cmd, args, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
