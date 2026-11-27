@@ -87,8 +87,8 @@ Type any skill as `/astack:<name>`.
 | `architect` | Sketches types, signatures, and modules before code |
 | `tdd` | Failing test first, when asked or cheap |
 | `verify-web` | Proves each criterion against the running app |
-| `create-verification-skill` | Generates a project-local verification skill |
-| `maintain-verification-skill` | Keeps that skill and its feature map honest |
+| `create-verification-skill` | Generates a project verify skill: feature map plus `<app>-cli` driver |
+| `maintain-verification-skill` | Daily pass that keeps the feature map and the CLI honest |
 | `pr-review` | Parallel read-only reviewer panel; the lead verifies each finding |
 | `shorekeeper` | Watches CI to green, fixes red runs within a retry bound |
 | `no-comments` | Removes needless comments before commit |
@@ -180,7 +180,9 @@ node scripts/config.ts model <role>
 
 ## Verify
 
-`npm run verify` runs the tests, typecheck, lint, and plugin validation, smoke-runs every script CLI offline, and checks that every playbook, skill, agent, and model role reference resolves. It prints `PASS`, `FAIL`, or `SKIP` per check and exits 1 on any failure. `docs/feature-map.md` lists each feature and how it is proved. Features that need a live GitHub repo are in `docs/acceptance/`.
+`npm run verify` runs the tests, typecheck, lint, and plugin validation, smoke-runs every script CLI offline, and checks that every playbook, skill, agent, and model role reference resolves. It prints `PASS`, `FAIL`, or `SKIP` per check and exits 1 on any failure. `docs/plugin-map.md` lists each plugin feature and how it is proved. Features that need a live GitHub repo are in `docs/acceptance/`.
+
+Your app is verified differently. `/astack:create-verification-skill` writes a project skill at `.claude/skills/verify-<app>/` with two parts. A feature map (`features/`, one file per feature with its route, selectors, expected end state, and owning source files) that the agent reads instead of searching the code. A driver CLI (`scripts/<app>-cli.mjs`) that the agent calls instead of writing a browser script: `<app>-cli launch`, `login`, `open /notes`, `click button:Save`, `snapshot`, `screenshot --out`, `cleanup`. Waits, auth, seed, and cleanup live once in the CLI, on the project's own Playwright. The `verify-web` skill drives every browser criterion through it. `/astack:maintain-verification-skill` keeps the map and the CLI honest; run it daily (`/astack:setup-astack` offers a `/loop` or a crontab line).
 
 ## Guide
 

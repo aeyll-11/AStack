@@ -21,6 +21,14 @@ Prerequisite: a branch with a trivial change and CI that passes. Run the `openin
 
 After either run, confirm no merge happened and that `.claude/settings.json` holds the `gh pr merge` deny entry written by `/astack:setup-astack`.
 
+## App driver CLI
+
+Prerequisite: a web app repo with Playwright as a dev dependency and no `.claude/skills/verify-*`. Run `/astack:create-verification-skill`.
+
+- The generated `.claude/skills/verify-<app>/scripts/<app>-cli.mjs` runs `launch`, `seed`, `login`, `doctor`, `open`, `click`, `fill`, `snapshot`, `screenshot`, `console`, and `cleanup` without edits.
+- After `cleanup`, `status` shows nothing alive, the port is free, and the screenshot still exists.
+- `/astack:verify-web` on a UI criterion drives it through that CLI and writes no browser script of its own.
+
 ## Live script runs
 
 `issues.ts claim|comment|release|pr-status`, `evidence.ts push`, and `watch-pr/cli.ts` against a real PR. The unit tests use fakes. Verify one real call each.
