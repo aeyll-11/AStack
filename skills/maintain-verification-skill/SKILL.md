@@ -18,7 +18,7 @@ Pick one, and say which:
 
 ## Edit scope
 
-Only edit the verification skill's own directory (its SKILL.md, features/, and its `scripts/<app>-cli.mjs`, config block included). Never edit product code during a run: a behavior the map describes that the app no longer does is either doc drift (fix the map) or a product regression (report it, don't paper over it in docs).
+Only edit the verification skill's own directory (its SKILL.md, features/, and its `scripts/<app>-cli.mjs`, config block included). If a write under `.claude/skills/` is refused (a headless `claude -p` run can refuse writes under `.claude/`), do not retry another way and never stage in `/tmp`: write the corrected files under `.astack/verify/staged/<skill>/` mirroring the skill's layout, report `blocked` or `changed` with that staging path, and give the user the exact copy command, `cp -R .astack/verify/staged/<skill>/. .claude/skills/<skill>/`. Never edit product code during a run, and never add test handles or markers to it: a behavior the map describes that the app no longer does is either doc drift (fix the map) or a product regression (report it, don't paper over it in docs). A missing stable marker or handle is not an edit: switch the map to an existing handle (landmark, heading, existing `data-*`, route text), or list a proposed test handle in the report (file, line, why) without applying it, and keep the skill independent of it until the user accepts.
 
 ## Pass
 

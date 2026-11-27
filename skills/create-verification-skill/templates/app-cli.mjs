@@ -377,7 +377,7 @@ async function main(argv) {
     case "fill": return withPage(x, flags, async (p) => { await act(p, x, ["fill", need(args[0], "fill <target> <text>"), args[1] ?? ""]); say(`ok fill ${args[0]}`); });
     case "press": return withPage(x, flags, async (p) => { await act(p, x, ["press", need(args[0], "press <key>")]); say(`ok press ${args[0]} url=${p.url()}`); });
     case "reload": return withPage(x, flags, async (p) => { await p.reload(); say(`ok reload ${p.url()}`); });
-    case "snapshot": return withPage(x, flags, async (p) => { const s = await snapshotOf(p); if (flags.out) writeFileSync(out(flags.out), s); say(`url: ${p.url()}\n${s}`); });
+    case "snapshot": return withPage(x, flags, async (p) => { const s = await snapshotOf(p); if (flags.out) { const o = out(flags.out); mkdirSync(dirname(o), { recursive: true }); writeFileSync(o, s); } say(`url: ${p.url()}\n${s}`); });
     case "screenshot": return withPage(x, flags, async (p) => { const o = out(flags.out); mkdirSync(dirname(o), { recursive: true }); await p.screenshot({ path: o }); say(`ok screenshot ${o}`); });
     case "wait": return withPage(x, flags, async (p) => {
       const timeout = Number(flags.timeout ?? 10000);
