@@ -26,6 +26,8 @@ Shell variables do not survive between Bash calls. Use the printed paths and the
 
 - Read the criteria from `$repo/.astack/spec/<branch>.md`. With no file, use the criteria in your brief. With neither, run the **spec** skill first.
 - For a bug repro, the criterion is the repro itself: the request, page, or test that shows the bug.
+- Tag every criterion by surface before you drive it: `[http]`, `[browser]`, or `[test]`. Criteria from a brief or a repro often carry no tag. Tag them by what a user touches: an API route is `[http]`, a page is `[browser]`. Use `[test]` only for logic no running app reaches cheaply.
+- If the change touches user-facing or runtime code (pages, components, routes, handlers, middleware, server config) and no criterion is `[http]` or `[browser]`, add one that exercises the changed path. A `[test]` never stands in for the running app.
 - Evidence stays local in `$ev`. Never `git add` it and never push it. The **opening-a-pr** playbook pushes images and traces with `evidence.ts`.
 
 ## 2. Use the project's own verify skill first
@@ -81,4 +83,11 @@ One row per criterion:
 | 1 | POST /api/notes/42/archive returns 204 | http | PASS | `.astack/evidence/feat-archive/1-http.txt` |
 | 2 | "Archive" removes the note from /notes | browser | INCONCLUSIVE | Skipped: no browser driver |
 
-The overall result is FAIL if any row fails, else INCONCLUSIVE if any row is inconclusive, else PASS. Paste text evidence (requests and responses, console output, test output) inline for the PR's `## How verified`. List the image and trace files separately, since those get pushed later.
+The overall result is the first that applies:
+
+1. **FAIL** if any row fails.
+2. **INCONCLUSIVE** if any row is inconclusive.
+3. **INCONCLUSIVE ("no real-app criterion")** if the change touches user-facing or runtime code and no `[http]` or `[browser]` row passed. Passing tests alone are proxy verification.
+4. **PASS** otherwise.
+
+Paste text evidence (requests and responses, console output, test output) inline for the PR's `## How verified`. List the image and trace files separately, since those get pushed later.

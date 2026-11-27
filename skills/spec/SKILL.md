@@ -25,7 +25,7 @@ Each criterion is one observable behavior, tagged with the surface that proves i
 Rules:
 
 - Every criterion is checkable by the **verify-web** skill without asking anyone. "Works well" and "is fast" are not criteria. "p95 of GET /api/notes under 200 ms with 1k seeded notes" is.
-- A user-facing change gets at least one `[http]` or `[browser]` criterion. A `[test]` criterion never stands in for the running app.
+- A change to user-facing or runtime code (pages, components, routes, handlers, middleware, server config) gets at least one `[http]` or `[browser]` criterion. A `[test]` never stands in for the running app. Without a passing `[http]` or `[browser]` criterion, **verify-web** reports INCONCLUSIVE, never PASS.
 - Cover the failure path the user can hit: bad input, missing auth, empty state.
 - Keep it short. Three to seven criteria is the usual range. More means the task should split.
 
