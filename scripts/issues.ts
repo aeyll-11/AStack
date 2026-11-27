@@ -22,6 +22,11 @@ export interface Claim {
 }
 
 export const IN_PROGRESS = "astack:in-progress";
+export const NEEDS_INFO = "astack:needs-info";
+const LABEL_INFO: Record<string, [string, string]> = {
+  [IN_PROGRESS]: ["fbca04", "An AStack agent is working on this issue"],
+  [NEEDS_INFO]: ["d876e3", "AStack asked a question and is waiting for an answer"],
+};
 const AUTH_RE = /gh auth login|not logged in|authentication required|bad credentials|HTTP 401/i;
 
 function gh(args: string[], cwd: string): string {
@@ -69,32 +74,79 @@ export function parseGhIssues(json: string): Issue[] {
 }
 
 export function listIssues(filter: NonNullable<AStackConfig["issues"]>, cwd: string): Issue[] {
-  return parseGhIssues(gh(buildGhListArgs(filter), cwd)).filter((i) => !i.labels.includes(IN_PROGRESS));
+  return parseGhIssues(gh(buildGhListArgs(filter), cwd)).filter(
+    (i) => !i.labels.includes(IN_PROGRESS) && !i.labels.includes(NEEDS_INFO),
+  );
+}
+
+// Runs an issue edit that adds `label`. If GitHub says the label does not exist, creates it once and retries.
+function editAddingLabel(edit: string[], label: string, cwd: string): void {
+  try {
+    gh(edit, cwd);
+  } catch (e) {
+    if (e instanceof GitHubUnavailable || !/not found/i.test((e as Error).message)) throw e;
+    const [color, description] = LABEL_INFO[label];
+    gh(["label", "create", label, "--force", "--color", color, "--description", description], cwd);
+    gh(edit, cwd);
+  }
 }
 
 export function claim(n: number, cwd: string): Claim {
   const view = JSON.parse(gh(["issue", "view", String(n), "--json", "state,assignees,labels"], cwd)) as {
     state: string;
     assignees: { login: string }[];
+    labels: { name: string }[];
   };
   if (view.state !== "OPEN") return { result: "skipped", reason: view.state.toLowerCase() };
+  const labels = (view.labels ?? []).map((l) => l.name);
+  if (labels.includes(IN_PROGRESS)) return { result: "skipped", reason: "in progress" };
+  if (labels.includes(NEEDS_INFO)) return { result: "skipped", reason: "needs info" };
   const me = gh(["api", "user", "--jq", ".login"], cwd);
   const other = view.assignees.find((a) => a.login !== me);
   if (other) return { result: "skipped", reason: `assigned to ${other.login}` };
-
-  const edit = ["issue", "edit", String(n), "--add-assignee", "@me", "--add-label", IN_PROGRESS];
-  try {
-    gh(edit, cwd);
-  } catch (e) {
-    if (e instanceof GitHubUnavailable || !/not found/i.test((e as Error).message)) throw e;
-    gh(["label", "create", IN_PROGRESS, "--force", "--color", "fbca04", "--description", "An AStack agent is working on this issue"], cwd);
-    gh(edit, cwd);
-  }
+  editAddingLabel(["issue", "edit", String(n), "--add-assignee", "@me", "--add-label", IN_PROGRESS], IN_PROGRESS, cwd);
   return { result: "claimed" };
 }
 
-export function release(n: number, cwd: string): void {
-  gh(["issue", "edit", String(n), "--remove-label", IN_PROGRESS, "--remove-assignee", "@me"], cwd);
+export function release(n: number, cwd: string, opts: { needsInfo?: boolean } = {}): void {
+  const edit = ["issue", "edit", String(n), "--remove-label", IN_PROGRESS, "--remove-assignee", "@me"];
+  if (opts.needsInfo) editAddingLabel([...edit, "--add-label", NEEDS_INFO], NEEDS_INFO, cwd);
+  else gh(edit, cwd);
+}
+
+export type CiState = "none" | "pending" | "green" | "red";
+export interface PrStatus {
+  number: number;
+  url: string;
+  draft: boolean;
+  state: string;
+  ci: CiState;
+}
+
+interface RollupItem {
+  status?: string;
+  conclusion?: string;
+  state?: string;
+}
+
+const RED = new Set(["FAILURE", "ERROR", "CANCELLED", "TIMED_OUT", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
+
+export function summarizeChecks(rollup: RollupItem[]): CiState {
+  if (rollup.length === 0) return "none";
+  const outcome = (c: RollupItem) => (c.state ?? (c.status === "COMPLETED" ? c.conclusion : "PENDING") ?? "PENDING");
+  const outcomes = rollup.map(outcome);
+  if (outcomes.some((o) => RED.has(o))) return "red";
+  if (outcomes.some((o) => o === "PENDING" || o === "EXPECTED" || o === "")) return "pending";
+  return "green";
+}
+
+export function prStatus(branch: string, cwd: string): PrStatus | null {
+  const raw = JSON.parse(
+    gh(["pr", "list", "--head", branch, "--state", "all", "--json", "number,url,isDraft,state,statusCheckRollup"], cwd),
+  ) as { number: number; url: string; isDraft: boolean; state: string; statusCheckRollup: RollupItem[] | null }[];
+  const pr = raw[0];
+  if (!pr) return null;
+  return { number: pr.number, url: pr.url, draft: pr.isDraft, state: pr.state, ci: summarizeChecks(pr.statusCheckRollup ?? []) };
 }
 
 export function comment(n: number, body: string[], cwd: string): void {
@@ -102,7 +154,8 @@ export function comment(n: number, body: string[], cwd: string): void {
   gh(["issue", "comment", String(n), ...args], cwd);
 }
 
-const USAGE = "usage: issues.ts list | claim <n> | comment <n> <text> | comment <n> --body-file <f> | release <n>";
+const USAGE =
+  "usage: issues.ts list | claim <n> | comment <n> <text> | comment <n> --body-file <f> | release <n> [--needs-info] | pr-status <branch>";
 
 function issueNumber(arg: string | undefined): number {
   const n = Number(arg);
@@ -129,8 +182,11 @@ export function main(argv: string[]): void {
       out({ issue: n, commented: true });
     } else if (cmd === "release") {
       const n = issueNumber(arg);
-      release(n, cwd);
-      out({ issue: n, released: true });
+      const needsInfo = rest.includes("--needs-info");
+      release(n, cwd, { needsInfo });
+      out({ issue: n, released: true, needsInfo });
+    } else if (cmd === "pr-status" && arg) {
+      out({ branch: arg, pr: prStatus(arg, cwd) });
     } else {
       throw new Error(USAGE);
     }
