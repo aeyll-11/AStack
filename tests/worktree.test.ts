@@ -153,3 +153,34 @@ test("no .astack/config.json reports astackConfig false", async () => {
   const slot = await createSlot({ repoRoot: repo, branch: "nocfg", slot: 0, basePort: 3100 });
   assert.equal(slot.astackConfig, false);
 });
+
+test("copies untracked .claude/skills/verify-* dirs into a new slot and never overwrites", async () => {
+  const repo = makeRepo(false);
+  const skill = join(repo, ".claude", "skills", "verify-notes");
+  mkdirSync(join(skill, "scripts"), { recursive: true });
+  writeFileSync(join(skill, "SKILL.md"), "root\n");
+  writeFileSync(join(skill, "scripts", "notes-cli.mjs"), "cli\n");
+  mkdirSync(join(repo, ".claude", "skills", "other"), { recursive: true });
+  writeFileSync(join(repo, ".claude", "skills", "other", "SKILL.md"), "x\n");
+  const slot = await createSlot({ repoRoot: repo, branch: "vs", slot: 0, basePort: 3100 });
+  const dest = join(slot.path, ".claude", "skills", "verify-notes");
+  assert.deepEqual(slot.verifySkills, ["verify-notes"]);
+  assert.equal(readFileSync(join(dest, "scripts", "notes-cli.mjs"), "utf8"), "cli\n");
+  assert.equal(existsSync(join(slot.path, ".claude", "skills", "other")), false);
+  writeFileSync(join(dest, "SKILL.md"), "slot edit\n");
+  await createSlot({ repoRoot: repo, branch: "vs", slot: 0, basePort: 3100 });
+  assert.equal(readFileSync(join(dest, "SKILL.md"), "utf8"), "slot edit\n");
+});
+
+test("a tracked verify skill is left to git", async () => {
+  const repo = makeRepo(false);
+  const skill = join(repo, ".claude", "skills", "verify-notes");
+  mkdirSync(skill, { recursive: true });
+  writeFileSync(join(skill, "SKILL.md"), "committed\n");
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", "skill");
+  writeFileSync(join(skill, "SKILL.md"), "dirty\n");
+  const slot = await createSlot({ repoRoot: repo, branch: "vs-tracked", slot: 0, basePort: 3100 });
+  assert.deepEqual(slot.verifySkills, []);
+  assert.equal(readFileSync(join(slot.path, ".claude", "skills", "verify-notes", "SKILL.md"), "utf8"), "committed\n");
+});

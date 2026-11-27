@@ -1,4 +1,4 @@
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { createServer } from "node:net";
@@ -12,6 +12,7 @@ export interface Slot {
   port: number;
   envFiles: string[];
   astackConfig: boolean;
+  verifySkills: string[];
   installed: boolean;
 }
 
@@ -82,6 +83,22 @@ function copyProjectConfig(repoRoot: string, wt: string): boolean {
   return true;
 }
 
+// Untracked project verify skills (.claude/skills/verify-*) follow the repo into each slot. Tracked ones come with git.
+function copyVerifySkills(repoRoot: string, wt: string): string[] {
+  const dir = join(".claude", "skills");
+  if (!existsSync(join(repoRoot, dir))) return [];
+  const copied: string[] = [];
+  for (const ent of readdirSync(join(repoRoot, dir), { withFileTypes: true })) {
+    if (!ent.isDirectory() || !ent.name.startsWith("verify-")) continue;
+    const rel = join(dir, ent.name);
+    if (run("git", ["ls-files", "--", rel], repoRoot).trim()) continue;
+    const dest = join(wt, rel);
+    if (!existsSync(dest)) cpSync(join(repoRoot, rel), dest, { recursive: true });
+    copied.push(ent.name);
+  }
+  return copied.sort();
+}
+
 function installCommand(wt: string): [string, string[]] | null {
   const has = (f: string) => existsSync(join(wt, f));
   if (has("bun.lock") || has("bun.lockb")) return ["bun", ["install"]];
@@ -124,6 +141,7 @@ export async function createSlot(opts: {
       port,
       envFiles: copyEnvFiles(repoRoot, path),
       astackConfig: copyProjectConfig(repoRoot, path),
+      verifySkills: copyVerifySkills(repoRoot, path),
       installed,
     };
   }
@@ -137,12 +155,13 @@ export async function createSlot(opts: {
   }
   const envFiles = copyEnvFiles(repoRoot, path);
   const astackConfig = copyProjectConfig(repoRoot, path);
+  const verifySkills = copyVerifySkills(repoRoot, path);
   const install = process.env.ASTACK_SKIP_INSTALL === "1" ? null : installCommand(path);
   if (install) {
     run(install[0], install[1], path);
     installed = true;
   }
-  return { branch, path, port, envFiles, astackConfig, installed };
+  return { branch, path, port, envFiles, astackConfig, verifySkills, installed };
 }
 
 export function removeSlot(repoRoot: string, branch: string): void {
