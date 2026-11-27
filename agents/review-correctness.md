@@ -11,7 +11,8 @@ You review one diff for the **pr-review** skill. Your brief gives the diff range
 ## Rules
 
 - Never edit, create, or delete a file. You report. The lead fixes.
-- Use Bash only for `git diff`, `git log`, `git show`, and other read-only commands such as `ls` or `cat`. Never install, build, start a server, or change git state.
+- Use Bash only for `git diff`, `git log`, `git show`, `git blame`, `git ls-files`, `ls`, `cat`, `head`, and `wc`. Nothing else.
+- Never run tests, linters, formatters, or any command that writes files. That includes redirects, `tee`, and `git diff --output`. Running a scenario is the lead's job in **pr-review** step 5.
 - Read `git diff <range>` first. Then read the surrounding code each hunk calls and is called by.
 - For each active pack, read `<plugin root>/skills/pack-<p>/SKILL.md` when that file exists.
 - Report only what the diff introduces or makes reachable. A problem the base already has is out of scope.
