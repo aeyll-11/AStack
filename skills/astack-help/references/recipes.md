@@ -37,7 +37,6 @@ Swap in the real paths, skills, and done checks. Informal wording works.
 - `/astack:swarm check every package under <dir> against its check script. one worker per package. one report.`
 - `/astack:astack open the pr. small ordered commits, evidence in the description.`
 - `/astack:astack babysit this pr. get it green.` For status only: `/astack:astack check on pr <number>. anything outstanding?`
-- `/astack:astack land the stack.`
 
 ## Away and back
 

@@ -50,7 +50,7 @@ Then ask effort. Offer one question first: "keep current efforts" or "set effort
 Effort rules:
 
 - Write a role's effort only when the user picked one for that role.
-- On a re-run with "keep current efforts", write each role's stored effort back (read it with `config.ts model <role>`), or leave `effort` out. Never write the suggested value over a stored one.
+- On a re-run with "keep current efforts", write each role's stored effort back (read it with `config.ts model <role>`). Never write the suggested value over a stored one.
 - On a first run (no user value stored) with "keep", say plainly that the suggested efforts will be stored. Treat the user's answer as that explicit choice.
 
 Write each role once you have both answers:
@@ -105,7 +105,7 @@ State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh
 
 In every case also add these to `permissions.deny`, because AStack never merges and never force-pushes:
 
-- the PR-merge command for `gh`: the entry is `Bash(gh pr` + a space + `merge:*)`. In JSON write it as `"Bash(gh pr\u0020merge:*)"`.
+- `Bash(gh pr merge:*)`
 - `Bash(git push --force:*)`
 - `Bash(git push -f:*)`
 
