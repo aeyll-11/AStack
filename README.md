@@ -165,7 +165,7 @@ Two files. The project file overrides the user file. Missing keys use defaults.
 | `devServer` | unset | `command`, `basePort`, optional `readyPath` |
 | `concurrency` | `2` | Phoebe owners running at once |
 | `ciRetries` | `3` | Fix-and-push rounds before CI escalates |
-| `dbPerSlot` | `false` | Give each worktree slot its own database |
+| `dbPerSlot` | `false` | Reserved, no effect yet (slots share the local database) |
 | `configured` | `false` | Set by `/astack:setup-astack` |
 
 Roles: `lead`, `implementer`, `bugfix`, `mechanical`, `verify`, `review-correctness`, `review-security`, `review-performance`, `review-frontend`, `review-api`, `phoebe-owner`.

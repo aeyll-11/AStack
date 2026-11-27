@@ -28,4 +28,4 @@ On red past `ciRetries`, or on a conflict, the PR stays draft and the comment na
 
 ## Other code playbooks
 
-`verina` (bug), `perf`, `refactoring`, `visual-parity`, and `prototype` end in the same `opening-a-pr` tail, except `prototype`, which settles a fork and throws the code away. `multi-phase-plan` splits work into several PRs.
+`verina` (bug), `perf`, `refactoring`, and `visual-parity` end in the same `opening-a-pr` tail. `multi-phase-plan` splits work into several PRs. `prototype` settles a design fork and throws the code away, so it opens no PR.

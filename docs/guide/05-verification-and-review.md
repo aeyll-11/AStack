@@ -12,7 +12,7 @@ Set the dev server so the skill can start it:
 node <plugin root>/scripts/config.ts set devServer '{"command":"npm run dev","basePort":3000}' --project
 ```
 
-Each worktree slot runs on `basePort` plus its slot number. The database is shared unless `dbPerSlot` is `true`.
+Each worktree slot runs on `basePort` plus its slot number. Slots share the local database. `dbPerSlot` is reserved and has no effect yet.
 
 ## Project verification skill
 
@@ -27,7 +27,7 @@ The second runs periodically to keep the skill and its feature map accurate.
 
 ## Self-review
 
-`/astack:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, plus `review-performance` and `zhezhi` where the diff warrants. The lead verifies each finding and fixes only those with a concrete failure scenario.
+`/astack:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, and `review-performance`. `zhezhi` joins only when the diff touches UI files. The lead verifies each finding and fixes only those with a concrete failure scenario.
 
 Set each seat's model with `node <plugin root>/scripts/config.ts set models.review-security '{"model":"opus"}'`.
 
