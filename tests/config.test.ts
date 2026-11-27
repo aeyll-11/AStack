@@ -70,6 +70,13 @@ test("CLI set then get round-trips, preserving other keys", () => {
   assert.equal(cli(home, cwd, "model", "lead").stdout.trim(), "sonnet low");
 });
 
+test("CLI get prints string values raw, other values as JSON", () => {
+  const { home, cwd } = dirs();
+  assert.equal(cli(home, cwd, "set", "notify.reviewer", '"octocat"').status, 0);
+  assert.equal(cli(home, cwd, "get", "notify.reviewer").stdout, "octocat\n");
+  assert.equal(cli(home, cwd, "get", "notify.push").stdout.trim(), "true");
+});
+
 test("CLI set --project writes project file; path prints it", () => {
   const { home, cwd } = dirs();
   assert.equal(cli(home, cwd, "set", "ciRetries", "9", "--project").status, 0);

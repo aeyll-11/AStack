@@ -1,7 +1,7 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { GitHubUnavailable, repoSlug, run } from "../scripts/lib/git.ts";
@@ -112,4 +112,44 @@ test("exclude is written to the main repo when repoRoot is a linked worktree", a
   assert.match(readFileSafe(exclude), /\.worktrees\//);
   assert.ok(existsSync(inner.path));
   assert.ok(!existsSync(join(first.path, repo.slice(1))), "no stray absolute-path tree");
+});
+
+test("--base off a remote branch does not track it", async () => {
+  const repo = makeRepo(false);
+  git(repo, "remote", "add", "origin", repo);
+  git(repo, "fetch", "-q", "origin");
+  const slot = await createSlot({ repoRoot: repo, branch: "astack/feat", slot: 0, basePort: 3100, base: "origin/main" });
+  assert.ok(existsSync(join(slot.path, "a.txt")));
+  assert.throws(() => git(repo, "config", "--get", "branch.astack/feat.remote"));
+});
+
+test("copies an untracked .astack/config.json and never overwrites", async () => {
+  const repo = makeRepo(false);
+  mkdirSync(join(repo, ".astack"));
+  writeFileSync(join(repo, ".astack", "config.json"), '{"concurrency":2}\n');
+  const slot = await createSlot({ repoRoot: repo, branch: "cfg", slot: 0, basePort: 3100 });
+  const dest = join(slot.path, ".astack", "config.json");
+  assert.equal(readFileSync(dest, "utf8"), '{"concurrency":2}\n');
+  assert.equal(slot.astackConfig, true);
+  writeFileSync(dest, '{"concurrency":5}\n');
+  await createSlot({ repoRoot: repo, branch: "cfg", slot: 0, basePort: 3100 });
+  assert.equal(readFileSync(dest, "utf8"), '{"concurrency":5}\n');
+});
+
+test("a tracked .astack/config.json is left to git", async () => {
+  const repo = makeRepo(false);
+  mkdirSync(join(repo, ".astack"));
+  writeFileSync(join(repo, ".astack", "config.json"), "{}\n");
+  git(repo, "add", "-A");
+  git(repo, "commit", "-q", "-m", "cfg");
+  writeFileSync(join(repo, ".astack", "config.json"), '{"dirty":1}\n');
+  const slot = await createSlot({ repoRoot: repo, branch: "tracked", slot: 0, basePort: 3100 });
+  assert.equal(slot.astackConfig, false);
+  assert.equal(readFileSync(join(slot.path, ".astack", "config.json"), "utf8"), "{}\n");
+});
+
+test("no .astack/config.json reports astackConfig false", async () => {
+  const repo = makeRepo(false);
+  const slot = await createSlot({ repoRoot: repo, branch: "nocfg", slot: 0, basePort: 3100 });
+  assert.equal(slot.astackConfig, false);
 });

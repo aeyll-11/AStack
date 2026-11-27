@@ -16,6 +16,7 @@ const CURSOR_CI = /generalPurpose|bugbot|\.mdc|cursor-team-kit|control-ui|contro
 const CAST = ["Jinhsi", "Phoebe", "Shorekeeper", "Encore", "Xiangli Yao", "Verina", "Zhezhi"];
 const CAST_RE = new RegExp(`\\b(${CAST.join("|")})\\b`);
 const MERGE_RE = /gh\s+pr\s+merge/;
+const MERGE_DENY_RE = /Bash\(gh pr merge:\*\)/g;
 
 function walk(path: string, out: string[]): void {
   if (!existsSync(path)) return;
@@ -51,7 +52,7 @@ export function lintTree(root: string): LintIssue[] {
 
     lines.forEach((l, i) => {
       if (CURSOR_CS.test(l) || CURSOR_CI.test(l)) add(i + 1, "cursor-residue", `Cursor residue: ${l.trim()}`);
-      if (/^(skills|agents)\//.test(rel) && MERGE_RE.test(l)) add(i + 1, "merge-ban", "gh pr merge is banned");
+      if (/^(skills|agents)\//.test(rel) && MERGE_RE.test(l.replace(MERGE_DENY_RE, ""))) add(i + 1, "merge-ban", "gh pr merge is banned");
     });
 
     if (rel.startsWith(".claude-plugin/") && rel.endsWith(".json")) {

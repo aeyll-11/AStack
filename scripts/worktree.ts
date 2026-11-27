@@ -11,6 +11,7 @@ export interface Slot {
   path: string;
   port: number;
   envFiles: string[];
+  astackConfig: boolean;
   installed: boolean;
 }
 
@@ -60,6 +61,27 @@ function copyEnvFiles(repoRoot: string, wt: string): string[] {
   return copied.sort();
 }
 
+function isTracked(cwd: string, file: string): boolean {
+  try {
+    run("git", ["ls-files", "--error-unmatch", file], cwd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function copyProjectConfig(repoRoot: string, wt: string): boolean {
+  const rel = join(".astack", "config.json");
+  const src = join(repoRoot, rel);
+  if (!existsSync(src) || isTracked(repoRoot, rel)) return false;
+  const dest = join(wt, rel);
+  if (!existsSync(dest)) {
+    mkdirSync(join(wt, ".astack"), { recursive: true });
+    copyFileSync(src, dest);
+  }
+  return true;
+}
+
 function installCommand(wt: string): [string, string[]] | null {
   const has = (f: string) => existsSync(join(wt, f));
   if (has("bun.lock") || has("bun.lockb")) return ["bun", ["install"]];
@@ -96,22 +118,31 @@ export async function createSlot(opts: {
   let installed = false;
 
   if (existsSync(path) && isRegistered(repoRoot, path)) {
-    return { branch, path, port, envFiles: copyEnvFiles(repoRoot, path), installed };
+    return {
+      branch,
+      path,
+      port,
+      envFiles: copyEnvFiles(repoRoot, path),
+      astackConfig: copyProjectConfig(repoRoot, path),
+      installed,
+    };
   }
 
   ensureExcluded(repoRoot);
   if (branchExists(repoRoot, branch)) {
     run("git", ["worktree", "add", path, branch], repoRoot);
   } else {
-    run("git", ["worktree", "add", "-b", branch, path, opts.base ?? "HEAD"], repoRoot);
+    const from = opts.base ? ["--no-track", "-b", branch, path, opts.base] : ["-b", branch, path, "HEAD"];
+    run("git", ["worktree", "add", ...from], repoRoot);
   }
   const envFiles = copyEnvFiles(repoRoot, path);
+  const astackConfig = copyProjectConfig(repoRoot, path);
   const install = process.env.ASTACK_SKIP_INSTALL === "1" ? null : installCommand(path);
   if (install) {
     run(install[0], install[1], path);
     installed = true;
   }
-  return { branch, path, port, envFiles, installed };
+  return { branch, path, port, envFiles, astackConfig, installed };
 }
 
 export function removeSlot(repoRoot: string, branch: string): void {
@@ -130,7 +161,7 @@ export async function main(argv: string[]): Promise<void> {
     const cwd = process.cwd();
     const repoRoot = run("git", ["rev-parse", "--show-toplevel"], cwd);
     const branch = flag(rest, "--branch");
-    if (!branch) throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base main] | remove --branch <b>");
+    if (!branch) throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b>");
     if (cmd === "create") {
       const slot = Number(flag(rest, "--slot") ?? "0");
       if (!Number.isInteger(slot) || slot < 0) throw new Error("--slot must be a non-negative integer");
@@ -142,7 +173,7 @@ export async function main(argv: string[]): Promise<void> {
       removeSlot(repoRoot, branch);
       process.stdout.write(JSON.stringify({ removed: branch }) + "\n");
     } else {
-      throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base main] | remove --branch <b>");
+      throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b>");
     }
   } catch (e) {
     process.stderr.write(`${(e as Error).message}\n`);

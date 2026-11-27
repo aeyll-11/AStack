@@ -28,6 +28,13 @@ test("merge-ban", () => {
   assert.equal(issues[0].rule, "merge-ban");
 });
 
+test("merge-ban exempts the deny entry only", () => {
+  const issues = lintTree(fx("dirty/merge-deny"));
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "merge-ban");
+  assert.equal(issues[0].line, 7);
+});
+
 test("frontmatter", () => {
   const issues = lintTree(fx("dirty/frontmatter"));
   assert.ok(issues.length >= 3);

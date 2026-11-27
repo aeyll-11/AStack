@@ -16,8 +16,8 @@ function cfg(over: Partial<AStackConfig>): AStackConfig {
   return { ...DEFAULTS, ...over };
 }
 
-const BASE =
-  "AStack is active. Route every non-trivial engineering task through the /astack:astack router: read its SKILL.md, pick the playbook, follow it. Active stack packs:";
+const ROUTER = join(here, "..", "skills", "astack", "SKILL.md");
+const BASE = `AStack is active. Route every non-trivial engineering task through the /astack:astack router: Read ${ROUTER}, pick the playbook, follow it. Active stack packs:`;
 
 test("router on, configured, packs", () => {
   assert.equal(buildContext(["bun", "nuxt"], cfg({ routerHook: true, configured: true })), `${BASE} bun, nuxt.`);
@@ -66,4 +66,5 @@ test("hook prints SessionStart JSON for a repo with packs", () => {
   const out = JSON.parse(r.stdout);
   assert.equal(out.hookSpecificOutput.hookEventName, "SessionStart");
   assert.match(out.hookSpecificOutput.additionalContext, /Active stack packs: node\./);
+  assert.ok(out.hookSpecificOutput.additionalContext.includes(`Read ${ROUTER},`));
 });
