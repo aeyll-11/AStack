@@ -95,10 +95,10 @@ With one or more, explain: the **maintain-verification-skill** skill keeps the f
 - **Crontab.** Show this line with the real absolute paths, for the user to add with `crontab -e`:
 
   ```
-  0 7 * * * cd <repo root> && mkdir -p .astack/verify && claude -p "/astack:maintain-verification-skill verify-<app>" --plugin-dir <plugin root> >> .astack/verify/maintain.log 2>&1
+  0 7 * * * cd <repo root> && mkdir -p .astack/verify && claude -p "/astack:maintain-verification-skill verify-<app>" --plugin-dir <plugin root> --permission-mode acceptEdits --allowedTools "Bash,Read,Edit,Write,Glob,Grep" >> .astack/verify/maintain.log 2>&1
   ```
 
-  Use the real skill folder name for `verify-<app>`, one line per verify skill, so an unattended run never stops to ask which one. Say that a headless run needs the allowlist from step 8. **Never install it yourself.**
+  Use the real skill folder name for `verify-<app>`, one line per verify skill, so an unattended run never stops to ask which one. Say that a headless run needs the allowlist from step 8. Claude Code protects `.claude/` from writes, and in testing no flag or rule lifted that for `claude -p`, so a cron run may stage its corrections under `.astack/verify/staged/<skill>/` and print a copy command in `maintain.log` for the user to run. **Never install it yourself.**
 - **Skip.**
 
 ## 7. Router hook
@@ -116,6 +116,7 @@ Broad entries (default set):
 - `Bash(<pm>:*)` where `<pm>` follows the lockfile: `pnpm-lock.yaml` is `pnpm`, `yarn.lock` is `yarn`, `bun.lock` or `bun.lockb` is `bun`, otherwise `npm`.
 - `Bash(node:*)`
 - `Bash(npx playwright:*)`
+- `Write(.claude/skills/verify-*/**)` and `Edit(.claude/skills/verify-*/**)`, so the verification skills can be generated and maintained. Say that Claude Code may still refuse writes under `.claude/` in a headless run whatever the rule says; the skills then stage under `.astack/verify/staged/` and tell the user the copy command.
 
 State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes merging a PR, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` (the plugin's own scripts, with the real absolute path). The user picks broad or narrow.
 
