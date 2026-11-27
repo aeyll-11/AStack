@@ -35,7 +35,7 @@ git diff --name-only <range> | grep -E '\.(vue|tsx|jsx|svelte|css|scss|html)$|(^
 
 ## 3. Fan out
 
-For each reviewer, run `node <plugin root>/scripts/config.ts model <role>`. It prints `<model> <effort>`. Spawn every reviewer in one message with the `Agent` tool, `subagent_type: "astack:<agent>"`, and the printed `model` and `effort`. The brief is the range, the packs, the absolute `<plugin root>`, and the PR title and `## Why` as intent.
+For each reviewer, run `node <plugin root>/scripts/config.ts model <role>`. It prints `<model> <effort>`. Spawn every reviewer in one message with the `Agent` tool, `subagent_type: "astack:<agent>"`, and the printed `model` and `effort`. The brief is the range, the packs, the absolute `<plugin root>`, the absolute path of the PR's checkout (the PR slot under the **astack** router), and the PR title and `## Why` as intent. Seats run git there with `git -C <path>` and read files under that path.
 
 A reviewer that fails or replies off-format drops out. Name it in the comment and continue with the rest.
 
