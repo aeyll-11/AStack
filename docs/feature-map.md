@@ -1,0 +1,69 @@
+# AStack feature map
+
+Every AStack feature, how it is proved, and the command that proves it. Proof kinds:
+
+- **unit**: covered by `tests/` (`npm test`).
+- **smoke**: covered by the offline checks in `scripts/verify.ts` (`npm run verify`).
+- **e2e**: only provable by a live run on a GitHub repo. See `docs/acceptance/README.md`.
+
+`npm run verify` also runs `npm test`, `tsc --noEmit`, `node scripts/lint.ts`, and `claude plugin validate .` (skipped when `claude` is not installed).
+
+## Router and playbooks
+
+| Feature | Files | How it is proved | Command |
+|---|---|---|---|
+| Router (Jinhsi) | `skills/astack/SKILL.md`, `skills/astack/worker.md` | smoke: table slugs, skill, agent, and role references resolve. e2e: a live routed task | `npm run verify`; `docs/acceptance/` |
+| Playbook files match router table (14) | `skills/astack/playbooks/*.md` | unit: `tests/playbooks.test.ts`; smoke: `playbooks` check | `npm test`; `npm run verify` |
+| feature, verina, perf, refactoring, prototype, visual-parity | `skills/astack/playbooks/<slug>.md` | unit: file exists and ends in `opening-a-pr`; smoke: references resolve | `npm test`; `npm run verify` |
+| investigation, multi-phase-plan, session-pickup, pause-safely, worktree-cleanup | `skills/astack/playbooks/<slug>.md` | unit: file exists; smoke: references resolve | `npm test`; `npm run verify` |
+| opening-a-pr (PR, self-review, CI, notify) | `skills/astack/playbooks/opening-a-pr.md` | e2e: ready PR, review request, summary comment, push notification | `docs/acceptance/README.md` |
+| phoebe (issue loop) and owner agent | `skills/astack/playbooks/phoebe.md`, `skills/astack/phoebe-owner.md` | e2e: claim, worktree slot, PR "Closes #n", needs-info question | `docs/acceptance/README.md` |
+| babysit | `skills/astack/playbooks/babysit.md` | e2e: an existing PR taken to green | `docs/acceptance/README.md` |
+
+## Skill groups
+
+| Feature | Files | How it is proved | Command |
+|---|---|---|---|
+| Setup and help: setup-astack, astack-help | `skills/setup-astack/`, `skills/astack-help/` | smoke: frontmatter lint and references | `npm run verify` |
+| Spec and design: spec, sharpen, in-your-own-words, architect, tdd | `skills/{spec,sharpen,in-your-own-words,architect,tdd}/` | smoke: frontmatter lint and references | `npm run verify` |
+| Verification: verify-web, create-verification-skill, maintain-verification-skill | `skills/{verify-web,create-verification-skill,maintain-verification-skill}/` | smoke: lint and references. e2e: a run against a live app | `npm run verify` |
+| Review and CI: pr-review, shorekeeper | `skills/{pr-review,shorekeeper}/` | smoke: lint and references. e2e: CI watch on a real PR | `npm run verify`; `docs/acceptance/` |
+| Prose and cleanup: no-comments, unslop, technical-writing, typescript-best-practices | `skills/{no-comments,unslop,technical-writing,typescript-best-practices}/` | smoke: lint and references | `npm run verify` |
+| Orchestration: swarm, arena, interrogate, blast-radius, benchmark-checklist, figure-it-out, show-me-your-work | `skills/{swarm,arena,interrogate,blast-radius,benchmark-checklist,figure-it-out,show-me-your-work}/` | smoke: lint, references, `config.ts model` roles are valid | `npm run verify` |
+| Context: how, why, recall, ketchup, reflect, correct | `skills/{how,why,recall,ketchup,reflect,correct}/` | smoke: lint and references | `npm run verify` |
+| Principles (24) | `skills/principle-*/` | smoke: lint and every `**principle-x**` reference resolves | `npm run verify` |
+| Stack packs (3): pack-nuxt, pack-node, pack-bun | `skills/pack-{nuxt,node,bun}/` | smoke: lint and references; detection is covered under `detect.ts` | `npm run verify` |
+
+## Agents (7)
+
+| Feature | Files | How it is proved | Command |
+|---|---|---|---|
+| xiangli-yao (implementer) | `agents/xiangli-yao.md` | smoke: every `astack:xiangli-yao` reference resolves; lint frontmatter | `npm run verify` |
+| review-correctness, review-security, review-performance, review-api | `agents/review-*.md` | smoke: references resolve; lint. e2e: a live `pr-review` panel | `npm run verify` |
+| zhezhi (frontend reviewer) | `agents/zhezhi.md` | smoke: as above | `npm run verify` |
+| comment-sicko | `agents/comment-sicko.md` | smoke: as above | `npm run verify` |
+
+## Scripts
+
+| Feature | Files | How it is proved | Command |
+|---|---|---|---|
+| config (`path`, `get`, `set`, `model <role>`) | `scripts/config.ts`, `scripts/lib/config.ts` | unit: `tests/config.test.ts`; smoke: `path`, `model lead`, unknown role exits 2 | `npm test`; `npm run verify` |
+| detect (stack packs) | `scripts/detect.ts`, `scripts/lib/detect.ts`, `tests/fixtures/repos/*` | unit: `tests/detect.test.ts`; smoke: each fixture prints its expected array | `npm test`; `npm run verify` |
+| session-start | `scripts/session-start.ts` | unit: `tests/session-start.test.ts`; smoke: stdin JSON gives `hookSpecificOutput` with the router path | `npm test`; `npm run verify` |
+| lint | `scripts/lint.ts` | unit: `tests/lint.test.ts`; smoke: runs clean on the repo | `npm test`; `npm run lint` |
+| worktree (`create`, `remove`) | `scripts/worktree.ts`, `scripts/lib/git.ts` | unit: `tests/worktree.test.ts`; smoke: create and remove in a temp repo | `npm test`; `npm run verify` |
+| evidence (`push --pr <n> <files...>`) | `scripts/evidence.ts` | unit: `tests/evidence.test.ts`; smoke: no args gives a usage error. e2e: a real push | `npm test`; `npm run verify` |
+| issues (`list`, `claim`, `comment`, `release`, `pr-status`) | `scripts/issues.ts` | unit: `tests/issues.test.ts`; smoke: `list` without `gh` exits 2 with "GitHub unavailable". e2e: live claim and comment | `npm test`; `npm run verify` |
+| watch-pr | `scripts/watch-pr/*.ts` | unit: `tests/watch-pr/*.test.ts`; smoke: `1 --once --json` without `gh` exits 2. e2e: a live PR | `npm test`; `npm run verify` |
+| decision-log | `scripts/decision-log.ts` | unit: `tests/decision-log.test.ts` | `npm test` |
+| dev/fetch-pstack (maintainer tool, needs network) | `scripts/dev/fetch-pstack.ts`, `vendor/pstack` | unit: `tests/fetch-pstack.test.ts` | `npm test` |
+| verify (this CLI) | `scripts/verify.ts` | unit: `tests/verify.test.ts` covers the structure checkers | `npm test`; `npm run verify` |
+
+## Hook and manifests
+
+| Feature | Files | How it is proved | Command |
+|---|---|---|---|
+| SessionStart hook | `hooks/hooks.json`, `scripts/session-start.ts` | smoke: script output; lint scans `hooks/`. e2e: a fresh Claude Code session shows the router pointer | `npm run verify`; `docs/acceptance/` |
+| Plugin manifest | `.claude-plugin/plugin.json` | unit: `tests/manifest.test.ts`; smoke: `claude plugin validate .` | `npm test`; `npm run verify` |
+| Marketplace manifest | `.claude-plugin/marketplace.json` | unit: `tests/manifest.test.ts`; smoke: `claude plugin validate .` | `npm test`; `npm run verify` |
+| Merge ban | `scripts/lint.ts` (`merge-ban` rule) | unit: `tests/lint.test.ts`. e2e: no merge after a live run | `npm test`; `docs/acceptance/` |
