@@ -1,5 +1,11 @@
 # Create a note
 
+- **Route:** `/notes`, `/notes/new`, `/notes/<id>`, `POST /api/notes`
+- **Selectors:** `button:New note`, `form:Note editor`, `textbox:Title`, `textbox:Body`, `button:Save note`, `button:Cancel`, `status:Note saved`, `testid:notes-list`
+- **Preconditions:** signed in as `verify@example.test`; no note titled `Release checklist`.
+- **Expected:** the note appears in `testid:notes-list`, survives a reload, and `GET /api/notes?title=...` returns it.
+- **Ownership:** `app/pages/notes/new.vue` (entry), `app/stores/notes.ts` (state), `server/api/notes/index.post.ts` (API)
+
 Create note lets a signed-in user save a titled note from the `/notes` page or the API, cancel an unfinished draft, and confirm the saved note from a second view.
 
 ## Sub-features
@@ -18,28 +24,23 @@ Create note lets a signed-in user save a titled note from the `/notes` page or t
 - Open `/notes/new` directly.
 - Send `POST /api/notes` with a JSON body `{ "title": ..., "body": ... }`.
 
-## Driving it with verify-notes
+## Driving it with notes-cli
 
-Preconditions:
-
-- Notes is healthy at `http://127.0.0.1:$PORT` and `verify-notes doctor` passes.
-- The session in `auth.json` belongs to `verify@example.test`.
-- No note is titled `Release checklist`.
-
-- **Open editor.** Choose `New note`. Run `verify-notes browser goto /notes` and `verify-notes browser click --role button --name "New note"`. The URL becomes `/notes/new` and a form named `Note editor` has focus in the `Title` textbox.
-- **Empty title.** Choose `Save note` with no title. Run `verify-notes browser click --role button --name "Save note"`. An alert reading `Title is required` appears and the URL stays `/notes/new`.
-- **Enter content.** Type the title and body. Run `verify-notes browser fill --role textbox --name "Title" --value "Release checklist"` and `verify-notes browser fill --role textbox --name "Body" --value "Tag and publish"`. The alert disappears.
-- **Save note.** Choose `Save note`. Run `verify-notes browser click --role button --name "Save note"`. A status named `Note saved` appears, the URL becomes `/notes/<id>`, and the heading reads `Release checklist`.
-- **Confirm persistence.** Reload the page. Run `verify-notes browser reload`. The editor shows both saved values. Then run `verify-notes http -- -X GET /api/notes?title=Release%20checklist`. Status `200` and the body has one note with body `Tag and publish`.
-- **Cancel draft.** Open a new note, enter `Discard me`, and choose `Cancel`. Run `verify-notes browser click --role button --name "New note"`, `verify-notes browser fill --role textbox --name "Title" --value "Discard me"`, and `verify-notes browser click --role button --name "Cancel"`. The URL returns to `/notes` and the `Notes` list has no `Discard me` link.
-- **API entry.** Create a second note. Run `verify-notes http -- -X POST /api/notes -H "content-type: application/json" -d '{"title":"API note","body":"Created over HTTP"}'`. Status `201` and the body contains the new note's `id` and title.
-- **No session.** Repeat the request without cookies. Run `verify-notes http --anonymous -- -X POST /api/notes -H "content-type: application/json" -d '{"title":"x"}'`. Status `401` and no note titled `x` exists afterwards.
-- **Proof.** Show both saved notes in the list. Run `verify-notes browser goto /notes`, `verify-notes browser snapshot --aria --path create-note/list.aria.txt`, and `verify-notes browser screenshot --path create-note/list.png`. The artifacts show `Release checklist` and `API note`.
+- **Open editor.** `notes-cli open /notes`, then `notes-cli click "button:New note"`. The URL becomes `/notes/new` and `notes-cli snapshot` shows a form `Note editor` with an empty `Title` textbox.
+- **Keyboard entry.** `notes-cli open /notes`, then `notes-cli press n`. The same editor opens.
+- **Empty title.** `notes-cli click "button:Save note"`. The snapshot shows an alert `Title is required` and the URL stays `/notes/new`.
+- **Enter content.** `notes-cli fill "textbox:Title" "Release checklist"`, then `notes-cli fill "textbox:Body" "Tag and publish"`. The alert is gone from the snapshot.
+- **Save note.** `notes-cli click "button:Save note"`, then `notes-cli wait --text "Note saved"`. The URL becomes `/notes/<id>` and the heading reads `Release checklist`.
+- **Confirm persistence.** `notes-cli reload`, then `notes-cli snapshot`. The editor shows both saved values. Then `curl -sS -i -b .astack/verify/cookies.txt "http://127.0.0.1:$PORT/api/notes?title=Release%20checklist"`. Status `200` and one note with body `Tag and publish`.
+- **Cancel draft.** `notes-cli click "button:New note"`, `notes-cli fill "textbox:Title" "Discard me"`, `notes-cli click "button:Cancel"`. The URL returns to `/notes` and `testid:notes-list` has no `Discard me` link.
+- **API entry.** `curl -sS -i -b .astack/verify/cookies.txt -X POST "http://127.0.0.1:$PORT/api/notes" -H "content-type: application/json" -d '{"title":"API note","body":"Created over HTTP"}'`. Status `201` and the body has the new `id` and title.
+- **No session.** The same request without `-b`. Status `401`, and `notes-cli open /notes` shows no note titled `x`.
+- **Proof.** `notes-cli open /notes`, `notes-cli snapshot --out .astack/evidence/$BRANCH/create-note.aria.txt`, `notes-cli screenshot --out .astack/evidence/$BRANCH/create-note.png`, `notes-cli console`. Both artifacts show `Release checklist` and `API note`, and `console` reports `errors=0`.
 
 ## Gotchas
 
-- Pressing `n` while a textbox has focus types the character instead of opening a new editor.
+- `notes-cli press n` while a textbox has focus types the character instead of opening a new editor. Open `/notes` first.
 - Titles are trimmed on save. Assert the rendered title, not the draft input value.
-- A `Note saved` status alone is insufficient proof. Reload the page or read the note back over the API.
-- The API requires the CSRF header `x-csrf-token` from the session. `verify-notes http` adds it. Raw `curl` gets `403`.
-- Remove `Release checklist` and `API note` during cleanup with `npm run db:seed -- --fixture verify --reset`, but keep their proof artifacts.
+- A `Note saved` status alone is insufficient proof. Reload or read the note back over the API.
+- The API needs the `x-csrf-token` header from the session cookie. Without it the request gets `403`, which is not the `401` this map expects.
+- Reset `Release checklist` and `API note` with `notes-cli seed` after the run, but keep their proof artifacts.
