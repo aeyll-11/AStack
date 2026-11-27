@@ -27,7 +27,7 @@ The second runs periodically to keep the skill and its feature map accurate.
 
 ## Self-review
 
-`/astack:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, and `review-performance`. `zhezhi` joins only when the diff touches UI files. The lead verifies each finding and fixes only those with a concrete failure scenario.
+`/astack:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, and `review-performance`. `zhezhi` joins only when the diff touches UI files. The lead verifies each finding, fixes only those with a concrete failure scenario, pushes, and posts one PR comment with every finding and its verdict. The PR summary links that comment.
 
 Set each seat's model with `node <plugin root>/scripts/config.ts set models.review-security '{"model":"opus"}'`.
 

@@ -8,21 +8,21 @@ The `feature` playbook takes a description to a green PR.
 
 ## Steps
 
-1. **Sharpen.** The **spec** skill writes goal, acceptance criteria, labeled guesses, and open questions. There is no human gate. Guesses carry on into the PR's `## Open questions`.
-2. **Architect.** The **architect** skill fixes data shape, types, and module boundaries before logic.
-3. **Implement.** An `xiangli-yao` agent in its own worktree writes the code. When several valid shapes exist, the **arena** skill runs competing candidates.
-4. **Test.** Tests assert observable behavior. TDD where it is cheap.
+1. **Slot.** The lead fetches and makes a worktree slot on a new PR branch `astack/<slug>`, cut from trunk. Every later step runs there.
+2. **Sharpen.** The **spec** skill writes goal, acceptance criteria, labeled guesses, and open questions. There is no human gate. The whole spec goes into the PR's `## Spec`.
+3. **Architect.** The **architect** skill fixes data shape, types, and module boundaries before logic.
+4. **Implement.** An `xiangli-yao` agent writes the code in the slot while the lead waits. Its brief asks for TDD where it is cheap, with tests that assert observable behavior. When several valid shapes exist, the **arena** skill runs competing candidates.
 5. **Verify.** The **verify-web** skill drives the running app. See [verification and review](05-verification-and-review.md).
 6. **Open the PR.** The `opening-a-pr` playbook takes over.
 
 ## The PR tail
 
-1. Run **no-comments**, then **unslop** on the diff prose.
-2. Open a draft PR. The body has `## Why`, `## What changed`, `## How verified`, and `## Open questions`, at most 40 lines.
+1. Run **no-comments**, then **unslop** on the diff prose, and push the branch.
+2. Open a draft PR. The body has `## Why`, `## Spec` (the spec file verbatim), `## What changed`, `## How verified`, and `## Open questions` (only questions raised after the spec). It is at most 40 lines, not counting the spec.
 3. Push screenshots and traces with `node <plugin root>/scripts/evidence.ts push --pr <n> <files...>`.
-4. Self-review with **pr-review**, then fix real findings.
+4. Self-review with **pr-review**. It fixes real findings, pushes, and posts one review comment. Criteria the fixes touch are verified again.
 5. **shorekeeper** watches CI.
-6. On green, mark ready, request review, post the summary comment, and send the push notification.
+6. On green, mark ready and request review. The request is skipped when the reviewer would be the PR's author. Post the summary comment, which links the review comment, and send the push notification.
 
 On red past `ciRetries`, or on a conflict, the PR stays draft and the comment names the failing checks.
 
