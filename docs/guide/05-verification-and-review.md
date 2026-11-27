@@ -4,26 +4,44 @@
 
 ## Verify
 
-The **verify-web** skill checks each acceptance criterion on the real surface. It uses a real browser for UI and HTTP against a live dev server for backend work. Tests cover only what those cannot reach. It captures evidence locally. An "inconclusive" result is flagged, not passed.
-
-Set the dev server so the skill can start it:
-
-```
-node <plugin root>/scripts/config.ts set devServer '{"command":"npm run dev","basePort":3000}' --project
-```
+The **verify-web** skill checks each acceptance criterion on the real surface: HTTP against a live dev server for backend work, and the project's driver CLI for UI. Tests cover only what those cannot reach. It captures evidence locally. An "inconclusive" result is flagged, not passed.
 
 Each worktree slot runs on `basePort` plus its slot number. Slots share the local database. `dbPerSlot` is reserved and has no effect yet.
 
 ## Project verification skill
 
-Generate a skill that drives your app the way a user does: server launch, sign-in, seed data, routes.
+Browser verification needs a project verify skill. If the repo has none, **verify-web** generates one first.
 
 ```
 /astack:create-verification-skill
+```
+
+It writes `.claude/skills/verify-<app>/` with two parts:
+
+- **Feature map.** `features/README.md` plus one file per user-facing feature. Each file names its `Route:`, `Selectors:`, `Preconditions:`, `Expected:` end state, and `Ownership:` source files, then lists the CLI calls that drive it. The agent reads the map instead of searching the code.
+- **Driver CLI.** `scripts/<app>-cli.mjs`, built on the project's own Playwright. The agent calls it instead of writing a browser script:
+
+  ```
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs launch --port 3101
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs login
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs open /notes
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs click "button:New note"
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs snapshot
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs screenshot --out .astack/evidence/feat-x/1.png
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs cleanup
+  ```
+
+  Targets are a role and name, a test id, a label, or text, never coordinates. Waits, sign-in, seed, and cleanup live once in the CLI, so every session reuses the same tested steps.
+
+Without Playwright in the project, browser criteria stay inconclusive.
+
+## Daily maintenance
+
+```
 /astack:maintain-verification-skill
 ```
 
-The second runs periodically to keep the skill and its feature map accurate.
+It reads the source for every feature, checks `Ownership:` paths and `Selectors:` handles, drives every feature live through the CLI, and opens at most one PR of proven fixes to the map or the CLI. It needs the app running locally, so schedule it on your machine. `/astack:setup-astack` offers `/loop 24h /astack:maintain-verification-skill` in an open session, or shows a crontab line for you to add.
 
 ## Self-review
 
