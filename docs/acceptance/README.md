@@ -4,10 +4,10 @@ These features cannot be proved offline. They need a live run against a GitHub r
 
 ## Phoebe issue loop
 
-Prerequisite: a throwaway repo with two labelled issues, one clear and one vague. Run `/astack:astack` on the `phoebe` playbook.
+Prerequisite: a throwaway repo with two labelled issues, one clear and one vague. Run `/resonator:resonator` on the `phoebe` playbook.
 
 - The clear issue gets claimed, a `phoebe-<n>` owner works it in its own worktree slot, and a green PR titled "Closes #<n>" opens.
-- The vague issue gets one specific question and the `astack:needs-info` label.
+- The vague issue gets one specific question and the `resonator:needs-info` label.
 
 ## opening-a-pr notification
 
@@ -19,15 +19,15 @@ Prerequisite: a branch with a trivial change and CI that passes. Run the `openin
 
 ## Never merges
 
-After either run, confirm no merge happened and that `.claude/settings.json` holds the `gh pr merge` deny entry written by `/astack:setup-astack`.
+After either run, confirm no merge happened and that `.claude/settings.json` holds the `gh pr merge` deny entry written by `/resonator:setup-resonator`.
 
 ## App driver CLI
 
-Prerequisite: a web app repo with Playwright as a dev dependency and no `.claude/skills/verify-*`. Run `/astack:create-verification-skill`.
+Prerequisite: a web app repo with Playwright as a dev dependency and no `.claude/skills/verify-*`. Run `/resonator:create-verification-skill`.
 
 - The generated `.claude/skills/verify-<app>/scripts/<app>-cli.mjs` runs `launch`, `seed`, `login`, `doctor`, `open`, `click`, `fill`, `snapshot`, `screenshot`, `console`, and `cleanup` without edits.
 - After `cleanup`, `status` shows nothing alive, the port is free, and the screenshot still exists.
-- `/astack:verify-web` on a UI criterion drives it through that CLI and writes no browser script of its own.
+- `/resonator:verify-web` on a UI criterion drives it through that CLI and writes no browser script of its own.
 
 ## Live script runs
 

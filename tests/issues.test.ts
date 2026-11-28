@@ -14,7 +14,7 @@ after(() => {
 });
 
 function tmp(): string {
-  const d = realpathSync(mkdtempSync(join(tmpdir(), "astack-issues-")));
+  const d = realpathSync(mkdtempSync(join(tmpdir(), "resonator-issues-")));
   dirs.push(d);
   return d;
 }
@@ -38,18 +38,18 @@ function fakeGh(cases: Record<string, string | { fail: string }>): { bin: string
 }
 
 function withGh<T>(bin: string, fn: () => T): T {
-  const prev = process.env.ASTACK_GH;
-  process.env.ASTACK_GH = bin;
+  const prev = process.env.RESONATOR_GH;
+  process.env.RESONATOR_GH = bin;
   try {
     return fn();
   } finally {
-    if (prev === undefined) delete process.env.ASTACK_GH;
-    else process.env.ASTACK_GH = prev;
+    if (prev === undefined) delete process.env.RESONATOR_GH;
+    else process.env.RESONATOR_GH = prev;
   }
 }
 
 const VIEW = "issue view 7 --json state,assignees,labels";
-const EDIT = "issue edit 7 --add-assignee @me --add-label astack:in-progress";
+const EDIT = "issue edit 7 --add-assignee @me --add-label resonator:in-progress";
 
 test("buildGhListArgs: two labels and an assignee", () => {
   assert.deepEqual(buildGhListArgs({ source: "github", labels: ["bug", "ready"], assignee: "octocat" }), [
@@ -133,20 +133,20 @@ case "$*" in
   '${VIEW}') echo '{"state":"OPEN","assignees":[],"labels":[]}' ;;
   'api user --jq .login') echo me ;;
   'label create'*) touch '${flag}' ;;
-  '${EDIT}') [ -f '${flag}' ] || { echo "could not add label: 'astack:in-progress' not found" >&2; exit 1; } ;;
+  '${EDIT}') [ -f '${flag}' ] || { echo "could not add label: 'resonator:in-progress' not found" >&2; exit 1; } ;;
 esac
 `,
   );
   chmodSync(bin, 0o755);
   assert.deepEqual(withGh(bin, () => claim(7, d)), { result: "claimed" });
   const calls = readFileSync(join(d, "calls.log"), "utf8").trim().split("\n");
-  assert.equal(calls.filter((c) => c.startsWith("label create astack:in-progress")).length, 1);
+  assert.equal(calls.filter((c) => c.startsWith("label create resonator:in-progress")).length, 1);
   assert.equal(calls.filter((c) => c === EDIT).length, 2);
 });
 
-test("claim skips an issue AStack already holds, even when assigned to me", () => {
+test("claim skips an issue Resonator already holds, even when assigned to me", () => {
   const gh = fakeGh({
-    [VIEW]: '{"state":"OPEN","assignees":[{"login":"me"}],"labels":[{"name":"astack:in-progress"}]}',
+    [VIEW]: '{"state":"OPEN","assignees":[{"login":"me"}],"labels":[{"name":"resonator:in-progress"}]}',
     "api user --jq .login": "me",
   });
   assert.deepEqual(withGh(gh.bin, () => claim(7, tmp())), { result: "skipped", reason: "in progress" });
@@ -154,14 +154,14 @@ test("claim skips an issue AStack already holds, even when assigned to me", () =
 });
 
 test("claim skips an issue waiting on an answer", () => {
-  const gh = fakeGh({ [VIEW]: '{"state":"OPEN","assignees":[],"labels":[{"name":"astack:needs-info"}]}' });
+  const gh = fakeGh({ [VIEW]: '{"state":"OPEN","assignees":[],"labels":[{"name":"resonator:needs-info"}]}' });
   assert.deepEqual(withGh(gh.bin, () => claim(7, tmp())), { result: "skipped", reason: "needs info" });
 });
 
 test("release --needs-info swaps in the needs-info label, creating it when missing", () => {
   const d = tmp();
   const flag = join(d, "label-made");
-  const edit = "issue edit 7 --remove-label astack:in-progress --remove-assignee @me --add-label astack:needs-info";
+  const edit = "issue edit 7 --remove-label resonator:in-progress --remove-assignee @me --add-label resonator:needs-info";
   const bin = join(d, "gh");
   writeFileSync(
     bin,
@@ -169,14 +169,14 @@ test("release --needs-info swaps in the needs-info label, creating it when missi
 printf '%s\n' "$*" >> '${d}/calls.log'
 case "$*" in
   'label create'*) touch '${flag}' ;;
-  '${edit}') [ -f '${flag}' ] || { echo "could not add label: 'astack:needs-info' not found" >&2; exit 1; } ;;
+  '${edit}') [ -f '${flag}' ] || { echo "could not add label: 'resonator:needs-info' not found" >&2; exit 1; } ;;
 esac
 `,
   );
   chmodSync(bin, 0o755);
   withGh(bin, () => release(7, d, { needsInfo: true }));
   const calls = readFileSync(join(d, "calls.log"), "utf8").trim().split("\n");
-  assert.equal(calls.filter((c) => c.startsWith("label create astack:needs-info")).length, 1);
+  assert.equal(calls.filter((c) => c.startsWith("label create resonator:needs-info")).length, 1);
   assert.equal(calls.filter((c) => c === edit).length, 2);
 });
 
@@ -188,14 +188,14 @@ test("summarizeChecks reduces a rollup to one CI state", () => {
   assert.equal(summarizeChecks([{ state: "PENDING" }]), "pending");
 });
 
-const PR_LIST = "pr list --head astack/12-dark-mode --state all --json number,url,isDraft,state,statusCheckRollup";
+const PR_LIST = "pr list --head resonator/12-dark-mode --state all --json number,url,isDraft,state,statusCheckRollup";
 
 test("prStatus reads the branch's PR and its CI", () => {
   const gh = fakeGh({
     [PR_LIST]:
       '[{"number":48,"url":"https://github.com/acme/web/pull/48","isDraft":true,"state":"OPEN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"FAILURE"}]}]',
   });
-  assert.deepEqual(withGh(gh.bin, () => prStatus("astack/12-dark-mode", tmp())), {
+  assert.deepEqual(withGh(gh.bin, () => prStatus("resonator/12-dark-mode", tmp())), {
     number: 48,
     url: "https://github.com/acme/web/pull/48",
     draft: true,
@@ -206,13 +206,13 @@ test("prStatus reads the branch's PR and its CI", () => {
 
 test("prStatus is null before the owner opens a PR", () => {
   const gh = fakeGh({ [PR_LIST]: "[]" });
-  assert.equal(withGh(gh.bin, () => prStatus("astack/12-dark-mode", tmp())), null);
+  assert.equal(withGh(gh.bin, () => prStatus("resonator/12-dark-mode", tmp())), null);
 });
 
 test("release removes the label and the assignee", () => {
   const gh = fakeGh({});
   withGh(gh.bin, () => release(7, tmp()));
-  assert.deepEqual(gh.calls(), ["issue edit 7 --remove-label astack:in-progress --remove-assignee @me"]);
+  assert.deepEqual(gh.calls(), ["issue edit 7 --remove-label resonator:in-progress --remove-assignee @me"]);
 });
 
 function githubRepo(): string {
@@ -226,7 +226,7 @@ function cli(args: string[], cwd: string, gh: string) {
   return spawnSync(process.execPath, [SCRIPT, ...args], {
     cwd,
     encoding: "utf8",
-    env: { ...process.env, ASTACK_GH: gh, HOME: tmp() },
+    env: { ...process.env, RESONATOR_GH: gh, HOME: tmp() },
   });
 }
 
@@ -248,8 +248,8 @@ test("list prints one JSON line and drops issues in progress or waiting on an an
   const args = buildGhListArgs({ source: "github" }).join(" ");
   const out = JSON.stringify([
     { number: 1, title: "Free", body: "b", url: "u1", labels: [], assignees: [] },
-    { number: 2, title: "Taken", body: "b", url: "u2", labels: [{ name: "astack:in-progress" }], assignees: [] },
-    { number: 3, title: "Asked", body: "b", url: "u3", labels: [{ name: "astack:needs-info" }], assignees: [] },
+    { number: 2, title: "Taken", body: "b", url: "u2", labels: [{ name: "resonator:in-progress" }], assignees: [] },
+    { number: 3, title: "Asked", body: "b", url: "u3", labels: [{ name: "resonator:needs-info" }], assignees: [] },
   ]);
   const gh = fakeGh({ [args]: out });
   const r = cli(["list"], githubRepo(), gh.bin);

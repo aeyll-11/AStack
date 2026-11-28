@@ -35,5 +35,5 @@ For a quick ballpark the user asked for, one run is enough. Still check question
 
 ## Other perf material
 
-- Vet the **perf** playbook's baseline (`<plugin root>/skills/astack/playbooks/perf.md`, where `<plugin root>` is two levels above this skill's folder) before the playbook plans from it, and every number after that.
+- Vet the **perf** playbook's baseline (`<plugin root>/skills/resonator/playbooks/perf.md`, where `<plugin root>` is two levels above this skill's folder) before the playbook plans from it, and every number after that.
 - Vet any harness before you freeze it. A frozen harness should print error and work counts, so each keep-or-revert checks questions 4 and 7 for free.

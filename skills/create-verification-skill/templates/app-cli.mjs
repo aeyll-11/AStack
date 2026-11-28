@@ -1,7 +1,7 @@
 #!/usr/bin/env node
-// Verification driver for this app. Generated from AStack's app-cli template.
+// Verification driver for this app. Generated from Resonator's app-cli template.
 // Every command and its use is documented in ../SKILL.md. When the app changes, edit the config block, not the code.
-/* astack-config
+/* resonator-config
 {
   "app": "<fill: app name, e.g. notes>",
   "port": 3100,
@@ -20,7 +20,7 @@
   },
   "flag": { "kind": "cookie", "prefix": "flag_" }
 }
-astack-config */
+resonator-config */
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -80,8 +80,8 @@ export function isOurProcess(ps, expect) {
 }
 
 export function parseConfigBlock(source) {
-  const m = /\/\* astack-config\n([\s\S]*?)\nastack-config \*\//.exec(source);
-  if (!m) throw new Error("no astack-config block found");
+  const m = /\/\* resonator-config\n([\s\S]*?)\nresonator-config \*\//.exec(source);
+  if (!m) throw new Error("no resonator-config block found");
   let raw;
   try { raw = JSON.parse(m[1]); } catch (e) { throw new Error(`config JSON: ${e.message}`); }
   const unfilled = [];
@@ -107,7 +107,7 @@ export function parseConfigBlock(source) {
 // ---- runtime ----
 const SELF = fileURLToPath(import.meta.url);
 const ROOT = process.env.APP_ROOT ?? resolve(dirname(SELF), "../../../..");
-const DIR = join(ROOT, ".astack", "verify");
+const DIR = join(ROOT, ".resonator", "verify");
 const F = { app: join(DIR, "app.json"), session: join(DIR, "session.json"), state: join(DIR, "state.json"), jar: join(DIR, "cookies.txt"), console: join(DIR, "console.log"),
   offset: join(DIR, "console.offset"), lastUrl: join(DIR, "last-url"), appLog: join(DIR, "app.log"), browserLog: join(DIR, "browser.log"), profile: join(DIR, "profile") };
 const readJson = (p) => { try { return JSON.parse(readFileSync(p, "utf8")); } catch { return null; } };

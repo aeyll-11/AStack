@@ -1,6 +1,6 @@
 ---
 name: pack-nuxt
-description: AStack stack pack for Nuxt apps. Read when the router detects nuxt.
+description: Resonator stack pack for Nuxt apps. Read when the router detects nuxt.
 disable-model-invocation: true
 ---
 

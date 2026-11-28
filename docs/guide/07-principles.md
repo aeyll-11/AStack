@@ -1,6 +1,6 @@
 # Principles
 
-AStack has 24 principles. Each is a skill named `principle-<title>`. The router reads the full skill before it applies one, and says in its reply which principle changed which decision.
+Resonator has 24 principles. Each is a skill named `principle-<title>`. The router reads the full skill before it applies one, and says in its reply which principle changed which decision.
 
 ## Core
 

@@ -16,7 +16,7 @@ Every candidate gets the same task and the same contract.
 
 1. State the artifact each candidate is producing.
 2. Derive the rubric, 3-6 concrete gradeable criteria for what success looks like on *this* task. It is the picker's tool in Phase D. Candidates only see the task.
-3. Seat the runners. The default is three. Each runner is a Claude agent spawned with `subagent_type: "astack:xiangli-yao"`. Run `node <plugin root>/scripts/config.ts model implementer` and pass the printed `model` and `effort` to every runner. Diversity comes from the brief, not the model. Give each seat one distinct angle on top of the shared task, such as "start from the data model", "reuse the existing modules and add the least new code", or "design the API a caller wants, then build down to it". Add seats for more design directions. Repeat one angle when the work is generation-bound, not judgment-sensitive.
+3. Seat the runners. The default is three. Each runner is a Claude agent spawned with `subagent_type: "resonator:xiangli-yao"`. Run `node <plugin root>/scripts/config.ts model implementer` and pass the printed `model` and `effort` to every runner. Diversity comes from the brief, not the model. Give each seat one distinct angle on top of the shared task, such as "start from the data model", "reuse the existing modules and add the least new code", or "design the API a caller wants, then build down to it". Add seats for more design directions. Repeat one angle when the work is generation-bound, not judgment-sensitive.
 4. Give each candidate its own output location: `isolation: "worktree"` where possible, otherwise `/tmp/arena-<slug>/candidate-<n>/`, per the **principle-separate-before-serializing-shared-state** skill.
 
 ## Phase B: Fan out

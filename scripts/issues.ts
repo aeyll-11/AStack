@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { homedir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { loadConfig } from "./lib/config.ts";
-import type { AStackConfig } from "./lib/config.ts";
+import type { ResonatorConfig } from "./lib/config.ts";
 import { GitHubUnavailable, ghBin, repoSlug, run } from "./lib/git.ts";
 
 export interface Issue {
@@ -21,11 +21,11 @@ export interface Claim {
   reason?: string;
 }
 
-export const IN_PROGRESS = "astack:in-progress";
-export const NEEDS_INFO = "astack:needs-info";
+export const IN_PROGRESS = "resonator:in-progress";
+export const NEEDS_INFO = "resonator:needs-info";
 const LABEL_INFO: Record<string, [string, string]> = {
-  [IN_PROGRESS]: ["fbca04", "An AStack agent is working on this issue"],
-  [NEEDS_INFO]: ["d876e3", "AStack asked a question and is waiting for an answer"],
+  [IN_PROGRESS]: ["fbca04", "An Resonator agent is working on this issue"],
+  [NEEDS_INFO]: ["d876e3", "Resonator asked a question and is waiting for an answer"],
 };
 const AUTH_RE = /gh auth login|not logged in|authentication required|bad credentials|HTTP 401/i;
 
@@ -42,7 +42,7 @@ function gh(args: string[], cwd: string): string {
   }
 }
 
-export function buildGhListArgs(f: NonNullable<AStackConfig["issues"]>): string[] {
+export function buildGhListArgs(f: NonNullable<ResonatorConfig["issues"]>): string[] {
   const args = ["issue", "list", "--state", "open", "--json", "number,title,body,url,labels,assignees"];
   for (const l of f.labels ?? []) args.push("--label", l);
   if (f.assignee) args.push("--assignee", f.assignee);
@@ -61,7 +61,7 @@ interface GhIssue {
 
 export function parseGhIssues(json: string): Issue[] {
   const raw: unknown = JSON.parse(json);
-  if (!Array.isArray(raw)) throw new Error("astack: gh issue list did not return an array");
+  if (!Array.isArray(raw)) throw new Error("resonator: gh issue list did not return an array");
   return (raw as GhIssue[]).map((i) => ({
     source: "github",
     id: String(i.number),
@@ -73,7 +73,7 @@ export function parseGhIssues(json: string): Issue[] {
   }));
 }
 
-export function listIssues(filter: NonNullable<AStackConfig["issues"]>, cwd: string): Issue[] {
+export function listIssues(filter: NonNullable<ResonatorConfig["issues"]>, cwd: string): Issue[] {
   return parseGhIssues(gh(buildGhListArgs(filter), cwd)).filter(
     (i) => !i.labels.includes(IN_PROGRESS) && !i.labels.includes(NEEDS_INFO),
   );
@@ -171,7 +171,7 @@ export function main(argv: string[]): void {
     const out = (v: unknown) => process.stdout.write(JSON.stringify(v) + "\n");
     if (cmd === "list") {
       const filter = loadConfig({ home: homedir(), cwd }).issues ?? { source: "github" };
-      if (filter.source !== "github") throw new Error(`astack: issues.source is ${filter.source}; this script reads GitHub only`);
+      if (filter.source !== "github") throw new Error(`resonator: issues.source is ${filter.source}; this script reads GitHub only`);
       out(listIssues(filter, cwd));
     } else if (cmd === "claim") {
       const n = issueNumber(arg);

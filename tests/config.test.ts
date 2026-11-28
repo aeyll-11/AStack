@@ -9,7 +9,7 @@ import { DEFAULTS, loadConfig, projectConfigPath, userConfigPath } from "../scri
 const CLI = join(import.meta.dirname, "..", "scripts", "config.ts");
 
 function dirs() {
-  return { home: mkdtempSync(join(tmpdir(), "astack-home-")), cwd: mkdtempSync(join(tmpdir(), "astack-cwd-")) };
+  return { home: mkdtempSync(join(tmpdir(), "resonator-home-")), cwd: mkdtempSync(join(tmpdir(), "resonator-cwd-")) };
 }
 function write(path: string, text: string) {
   mkdirSync(join(path, ".."), { recursive: true });
@@ -81,8 +81,8 @@ test("CLI set --project writes project file; path prints it", () => {
   const { home, cwd } = dirs();
   assert.equal(cli(home, cwd, "set", "ciRetries", "9", "--project").status, 0);
   assert.equal(cli(home, cwd, "get", "ciRetries").stdout.trim(), "9");
-  assert.ok(cli(home, cwd, "path", "--project").stdout.trim().endsWith(".astack/config.json"));
-  assert.ok(cli(home, cwd, "path").stdout.trim().endsWith(".claude/astack/config.json"));
+  assert.ok(cli(home, cwd, "path", "--project").stdout.trim().endsWith(".resonator/config.json"));
+  assert.ok(cli(home, cwd, "path").stdout.trim().endsWith(".claude/resonator/config.json"));
 });
 
 test("CLI model prints default and unknown role exits 2", () => {

@@ -22,4 +22,4 @@ Packs combine. A Nuxt app also reads `pack-node` or `pack-bun` for its runtime.
 
 ## If your stack has no pack
 
-The router proceeds without one. Run `/astack:correct` to turn repeated stack-specific mistakes into types, lints, or tests in your repo.
+The router proceeds without one. Run `/resonator:correct` to turn repeated stack-specific mistakes into types, lints, or tests in your repo.

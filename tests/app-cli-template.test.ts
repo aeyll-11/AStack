@@ -39,7 +39,7 @@ interface CliModule {
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
 const cli: CliModule = await import(templatePath);
 
-const block = (json: string) => `#!/usr/bin/env node\n/* astack-config\n${json}\nastack-config */\nconsole.log(1);\n`;
+const block = (json: string) => `#!/usr/bin/env node\n/* resonator-config\n${json}\nresonator-config */\nconsole.log(1);\n`;
 const minimal = {
   app: "notes",
   port: 3100,
@@ -106,7 +106,7 @@ test("parseConfigBlock reads the block and fills defaults", () => {
 });
 
 test("parseConfigBlock requires the block markers", () => {
-  assert.throws(() => cli.parseConfigBlock("console.log(1)"), /astack-config block/);
+  assert.throws(() => cli.parseConfigBlock("console.log(1)"), /resonator-config block/);
 });
 
 test("parseConfigBlock reports bad JSON", () => {

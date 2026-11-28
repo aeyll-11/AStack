@@ -11,7 +11,7 @@ export interface Slot {
   path: string;
   port: number;
   envFiles: string[];
-  astackConfig: boolean;
+  resonatorConfig: boolean;
   verifySkills: string[];
   installed: boolean;
 }
@@ -28,7 +28,7 @@ export async function freePort(start: number, isFree: (p: number) => Promise<boo
   for (let p = start; p < start + 50; p++) {
     if (await isFree(p)) return p;
   }
-  throw new Error(`astack: no free port in ${start}-${start + 49}`);
+  throw new Error(`resonator: no free port in ${start}-${start + 49}`);
 }
 
 function isIgnored(cwd: string, file: string): boolean {
@@ -72,12 +72,12 @@ function isTracked(cwd: string, file: string): boolean {
 }
 
 function copyProjectConfig(repoRoot: string, wt: string): boolean {
-  const rel = join(".astack", "config.json");
+  const rel = join(".resonator", "config.json");
   const src = join(repoRoot, rel);
   if (!existsSync(src) || isTracked(repoRoot, rel)) return false;
   const dest = join(wt, rel);
   if (!existsSync(dest)) {
-    mkdirSync(join(wt, ".astack"), { recursive: true });
+    mkdirSync(join(wt, ".resonator"), { recursive: true });
     copyFileSync(src, dest);
   }
   return true;
@@ -140,7 +140,7 @@ export async function createSlot(opts: {
       path,
       port,
       envFiles: copyEnvFiles(repoRoot, path),
-      astackConfig: copyProjectConfig(repoRoot, path),
+      resonatorConfig: copyProjectConfig(repoRoot, path),
       verifySkills: copyVerifySkills(repoRoot, path),
       installed,
     };
@@ -154,14 +154,14 @@ export async function createSlot(opts: {
     run("git", ["worktree", "add", ...from], repoRoot);
   }
   const envFiles = copyEnvFiles(repoRoot, path);
-  const astackConfig = copyProjectConfig(repoRoot, path);
+  const resonatorConfig = copyProjectConfig(repoRoot, path);
   const verifySkills = copyVerifySkills(repoRoot, path);
-  const install = process.env.ASTACK_SKIP_INSTALL === "1" ? null : installCommand(path);
+  const install = process.env.RESONATOR_SKIP_INSTALL === "1" ? null : installCommand(path);
   if (install) {
     run(install[0], install[1], path);
     installed = true;
   }
-  return { branch, path, port, envFiles, astackConfig, verifySkills, installed };
+  return { branch, path, port, envFiles, resonatorConfig, verifySkills, installed };
 }
 
 export function removeSlot(repoRoot: string, branch: string): void {

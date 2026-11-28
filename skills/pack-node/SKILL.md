@@ -1,6 +1,6 @@
 ---
 name: pack-node
-description: AStack stack pack for Node.js projects. Read when the router detects node.
+description: Resonator stack pack for Node.js projects. Read when the router detects node.
 disable-model-invocation: true
 ---
 

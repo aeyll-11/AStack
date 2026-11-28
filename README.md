@@ -1,6 +1,6 @@
-# AStack
+# Resonator
 
-AStack is a Claude Code plugin for JS/TS web engineering. Give it a task or an issue queue. It returns pull requests that are verified against the running app, reviewed by AStack itself, and green on CI. A human gets notified. AStack never merges.
+Resonator is a Claude Code plugin for JS/TS web engineering. Give it a task or an issue queue. It returns pull requests that are verified against the running app, reviewed by Resonator itself, and green on CI. A human gets notified. Resonator never merges.
 
 It is one plugin. It covers understanding the task, a short spec, design, implementation, tests, real-app verification, multi-angle review, fixes, the PR, the CI watch, and the notification.
 
@@ -8,17 +8,17 @@ It is one plugin. It covers understanding the task, a short spec, design, implem
 
 ```
 /plugin marketplace add <path or repo>
-/plugin install astack@astack
+/plugin install resonator@resonator
 ```
 
-AStack's router competes with other workflow plugins whose skills auto-trigger. `/astack:setup-astack` lists the ones you have enabled and gives the command to disable each.
+Resonator's router competes with other workflow plugins whose skills auto-trigger. `/resonator:setup-resonator` lists the ones you have enabled and gives the command to disable each.
 
 ## Get started
 
-1. Run `/astack:setup-astack`. You pick the model and effort for each role, then set the issue source, notifications, dev server, router hook, and permission allowlist.
-2. Run `/astack:astack <task>`. The router restates your goal, detects your stack packs, picks a playbook, and works it to a green PR.
+1. Run `/resonator:setup-resonator`. You pick the model and effort for each role, then set the issue source, notifications, dev server, router hook, and permission allowlist.
+2. Run `/resonator:resonator <task>`. The router restates your goal, detects your stack packs, picks a playbook, and works it to a green PR.
 
-Not sure which skill or playbook fits? Run `/astack:astack-help <question>`.
+Not sure which skill or playbook fits? Run `/resonator:resonator-help <question>`.
 
 ## The two workflows
 
@@ -36,22 +36,22 @@ issues -> claim -> triage -> worktree slot -> phoebe-<n> owner agent
   -> sharpen -> implement -> verify -> review -> CI -> green PR "Closes #<n>"
 ```
 
-An unclear issue gets one specific question and the `astack:needs-info` label. Run Phoebe under `/loop` for a continuous queue. See `docs/guide/04-phoebe.md`.
+An unclear issue gets one specific question and the `resonator:needs-info` label. Run Phoebe under `/loop` for a continuous queue. See `docs/guide/04-phoebe.md`.
 
 ## Never merges
 
-The end state of every task is a green PR with a human notified. When CI is green, AStack:
+The end state of every task is a green PR with a human notified. When CI is green, Resonator:
 
 1. marks the draft PR ready,
 2. requests review from `notify.reviewer` (or the repo owner),
 3. posts a summary comment: what changed, how verified, review findings, CI result, what is left,
 4. sends a Claude Code push notification, when `notify.push` is on.
 
-When CI stays red past the retry bound, or the branch conflicts, the PR stays a draft. The summary comment names each failing check with its link, and you still get the notification. `/astack:setup-astack` also adds deny entries for PR merge and force-push to the project's `.claude/settings.json`.
+When CI stays red past the retry bound, or the branch conflicts, the PR stays a draft. The summary comment names each failing check with its link, and you still get the notification. `/resonator:setup-resonator` also adds deny entries for PR merge and force-push to the project's `.claude/settings.json`.
 
 ## Playbooks
 
-The router opens `skills/astack/playbooks/<slug>.md` and copies its steps into the task list.
+The router opens `skills/resonator/playbooks/<slug>.md` and copies its steps into the task list.
 
 | Playbook | For |
 |---|---|
@@ -74,13 +74,13 @@ Large or unattended work, or a task no playbook fits, goes to the `figure-it-out
 
 ## Skills
 
-Type any skill as `/astack:<name>`.
+Type any skill as `/resonator:<name>`.
 
 | Skill | What it does |
 |---|---|
-| `astack` | The router. Picks a playbook and drives it |
-| `astack-help` | Answers "which skill or playbook do I use" |
-| `setup-astack` | Configures models, issue source, notifications, hook, allowlist |
+| `resonator` | The router. Picks a playbook and drives it |
+| `resonator-help` | Answers "which skill or playbook do I use" |
+| `setup-resonator` | Configures models, issue source, notifications, hook, allowlist |
 | `spec` | Turns a request or issue into goal, checkable criteria, guesses, open questions |
 | `sharpen` | Makes a task deeper, then rewrites the prompt |
 | `in-your-own-words` | Restates the user's goal and problem |
@@ -151,13 +151,13 @@ Packs combine. A Nuxt app on Bun gets `pack-nuxt` and `pack-bun`.
 
 Two files. The project file overrides the user file. Missing keys use defaults.
 
-- User: `~/.claude/astack/config.json`
-- Project: `.astack/config.json`
+- User: `~/.claude/resonator/config.json`
+- Project: `.resonator/config.json`
 
 | Key | Default | Meaning |
 |---|---|---|
 | `models.<role>` | per role | `{"model","effort"}`. Model is `opus`, `sonnet`, `haiku`, or `fable`. Effort is `low` to `max` |
-| `routerHook` | `true` | A `SessionStart` pointer that routes non-trivial tasks through `/astack:astack` |
+| `routerHook` | `true` | A `SessionStart` pointer that routes non-trivial tasks through `/resonator:resonator` |
 | `notify.push` | `true` | Send a push notification when a PR is ready or escalated |
 | `notify.requestReview` | `true` | Request review when CI is green |
 | `notify.reviewer` | unset | GitHub login to request. Falls back to the repo owner |
@@ -166,7 +166,7 @@ Two files. The project file overrides the user file. Missing keys use defaults.
 | `concurrency` | `2` | Phoebe owners running at once |
 | `ciRetries` | `3` | Fix-and-push rounds before CI escalates |
 | `dbPerSlot` | `false` | Reserved, no effect yet (slots share the local database) |
-| `configured` | `false` | Set by `/astack:setup-astack` |
+| `configured` | `false` | Set by `/resonator:setup-resonator` |
 
 Roles: `lead`, `implementer`, `bugfix`, `mechanical`, `verify`, `review-correctness`, `review-security`, `review-performance`, `review-frontend`, `review-api`, `phoebe-owner`.
 
@@ -182,7 +182,7 @@ node scripts/config.ts model <role>
 
 `npm run verify` runs the tests, typecheck, lint, and plugin validation, smoke-runs every script CLI offline, and checks that every playbook, skill, agent, and model role reference resolves. It prints `PASS`, `FAIL`, or `SKIP` per check and exits 1 on any failure. `docs/plugin-map.md` lists each plugin feature and how it is proved. Features that need a live GitHub repo are in `docs/acceptance/`.
 
-Your app is verified differently. `/astack:create-verification-skill` writes a project skill at `.claude/skills/verify-<app>/` with two parts. A feature map (`features/`, one file per feature with its route, selectors, expected end state, and owning source files) that the agent reads instead of searching the code. A driver CLI (`scripts/<app>-cli.mjs`) that the agent calls instead of writing a browser script: `<app>-cli launch`, `login`, `open /notes`, `click button:Save`, `snapshot`, `screenshot --out`, `cleanup`. Waits, auth, seed, and cleanup live once in the CLI, on the project's own Playwright. The `verify-web` skill drives every browser criterion through it. `/astack:maintain-verification-skill` keeps the map and the CLI honest; run it daily (`/astack:setup-astack` offers a `/loop` or a crontab line).
+Your app is verified differently. `/resonator:create-verification-skill` writes a project skill at `.claude/skills/verify-<app>/` with two parts. A feature map (`features/`, one file per feature with its route, selectors, expected end state, and owning source files) that the agent reads instead of searching the code. A driver CLI (`scripts/<app>-cli.mjs`) that the agent calls instead of writing a browser script: `<app>-cli launch`, `login`, `open /notes`, `click button:Save`, `snapshot`, `screenshot --out`, `cleanup`. Waits, auth, seed, and cleanup live once in the CLI, on the project's own Playwright. The `verify-web` skill drives every browser criterion through it. `/resonator:maintain-verification-skill` keeps the map and the CLI honest; run it daily (`/resonator:setup-resonator` offers a `/loop` or a crontab line).
 
 ## Guide
 
@@ -190,4 +190,4 @@ Task-oriented pages are in [docs/guide](docs/guide/README.md).
 
 ## Credits
 
-AStack is modeled on and ports material from [PStack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan, under the MIT License. See `NOTICE` and `LICENSE`.
+Resonator is modeled on and ports material from [PStack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan, under the MIT License. See `NOTICE` and `LICENSE`.

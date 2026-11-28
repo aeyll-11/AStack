@@ -21,7 +21,7 @@ export interface ModelChoice {
   effort?: Effort;
 }
 
-export interface AStackConfig {
+export interface ResonatorConfig {
   models: Record<Role, ModelChoice>;
   routerHook: boolean;
   notify: { push: boolean; requestReview: boolean; reviewer?: string };
@@ -50,7 +50,7 @@ export const ROLES: readonly Role[] = [
 const MODELS: readonly string[] = ["opus", "sonnet", "haiku", "fable"];
 const EFFORTS: readonly string[] = ["low", "medium", "high", "xhigh", "max"];
 
-export const DEFAULTS: AStackConfig = {
+export const DEFAULTS: ResonatorConfig = {
   models: {
     lead: { model: "opus", effort: "high" },
     implementer: { model: "opus", effort: "high" },
@@ -73,11 +73,11 @@ export const DEFAULTS: AStackConfig = {
 };
 
 export function userConfigPath(home: string): string {
-  return join(home, ".claude", "astack", "config.json");
+  return join(home, ".claude", "resonator", "config.json");
 }
 
 export function projectConfigPath(cwd: string): string {
-  return join(cwd, ".astack", "config.json");
+  return join(cwd, ".resonator", "config.json");
 }
 
 type Obj = Record<string, unknown>;
@@ -103,8 +103,8 @@ export function readJsonObject(path: string, warn: (m: string) => void): Obj | n
   return null;
 }
 
-function mergeLayer(base: AStackConfig, layer: Obj, source: string, warn: (m: string) => void): AStackConfig {
-  const out: AStackConfig = {
+function mergeLayer(base: ResonatorConfig, layer: Obj, source: string, warn: (m: string) => void): ResonatorConfig {
+  const out: ResonatorConfig = {
     ...base,
     models: { ...base.models },
     notify: { ...base.notify },
@@ -126,20 +126,20 @@ function mergeLayer(base: AStackConfig, layer: Obj, source: string, warn: (m: st
       out.models[role] = choice.effort === undefined ? { model: choice.model } : { model: choice.model, effort: choice.effort };
     }
   }
-  if (isObj(layer.notify)) out.notify = { ...out.notify, ...(layer.notify as Partial<AStackConfig["notify"]>) };
+  if (isObj(layer.notify)) out.notify = { ...out.notify, ...(layer.notify as Partial<ResonatorConfig["notify"]>) };
   if (typeof layer.routerHook === "boolean") out.routerHook = layer.routerHook;
   if (typeof layer.concurrency === "number") out.concurrency = layer.concurrency;
   if (typeof layer.ciRetries === "number") out.ciRetries = layer.ciRetries;
   if (typeof layer.dbPerSlot === "boolean") out.dbPerSlot = layer.dbPerSlot;
   if (typeof layer.configured === "boolean") out.configured = layer.configured;
-  if (isObj(layer.issues)) out.issues = layer.issues as unknown as NonNullable<AStackConfig["issues"]>;
-  if (isObj(layer.devServer)) out.devServer = layer.devServer as unknown as NonNullable<AStackConfig["devServer"]>;
+  if (isObj(layer.issues)) out.issues = layer.issues as unknown as NonNullable<ResonatorConfig["issues"]>;
+  if (isObj(layer.devServer)) out.devServer = layer.devServer as unknown as NonNullable<ResonatorConfig["devServer"]>;
   return out;
 }
 
-export function loadConfig(opts: { home: string; cwd: string; warn?: (m: string) => void }): AStackConfig {
-  const warn = opts.warn ?? ((m: string) => process.stderr.write(`astack: ${m}\n`));
-  let cfg: AStackConfig = DEFAULTS;
+export function loadConfig(opts: { home: string; cwd: string; warn?: (m: string) => void }): ResonatorConfig {
+  const warn = opts.warn ?? ((m: string) => process.stderr.write(`resonator: ${m}\n`));
+  let cfg: ResonatorConfig = DEFAULTS;
   for (const path of [userConfigPath(opts.home), projectConfigPath(opts.cwd)]) {
     const layer = readJsonObject(path, warn);
     if (layer) cfg = mergeLayer(cfg, layer, path, warn);

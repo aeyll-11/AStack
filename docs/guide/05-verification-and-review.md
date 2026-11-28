@@ -1,6 +1,6 @@
 # Verification and review
 
-"Tests pass" is not verification. AStack proves behavior against the running app.
+"Tests pass" is not verification. Resonator proves behavior against the running app.
 
 ## Verify
 
@@ -13,7 +13,7 @@ Each worktree slot runs on `basePort` plus its slot number. Slots share the loca
 Browser verification needs a project verify skill. If the repo has none, **verify-web** generates one first.
 
 ```
-/astack:create-verification-skill
+/resonator:create-verification-skill
 ```
 
 It writes `.claude/skills/verify-<app>/` with two parts:
@@ -27,7 +27,7 @@ It writes `.claude/skills/verify-<app>/` with two parts:
   node .claude/skills/verify-notes/scripts/notes-cli.mjs open /notes
   node .claude/skills/verify-notes/scripts/notes-cli.mjs click "button:New note"
   node .claude/skills/verify-notes/scripts/notes-cli.mjs snapshot
-  node .claude/skills/verify-notes/scripts/notes-cli.mjs screenshot --out .astack/evidence/feat-x/1.png
+  node .claude/skills/verify-notes/scripts/notes-cli.mjs screenshot --out .resonator/evidence/feat-x/1.png
   node .claude/skills/verify-notes/scripts/notes-cli.mjs cleanup
   ```
 
@@ -38,22 +38,22 @@ Without Playwright in the project, browser criteria stay inconclusive.
 ## Daily maintenance
 
 ```
-/astack:maintain-verification-skill
+/resonator:maintain-verification-skill
 ```
 
-It reads the source for every feature, checks `Ownership:` paths and `Selectors:` handles, drives every feature live through the CLI, and opens at most one PR of proven fixes to the map or the CLI. It needs the app running locally, so schedule it on your machine. `/astack:setup-astack` offers `/loop 24h /astack:maintain-verification-skill verify-<app>` in an open session, or shows a crontab line for you to add.
+It reads the source for every feature, checks `Ownership:` paths and `Selectors:` handles, drives every feature live through the CLI, and opens at most one PR of proven fixes to the map or the CLI. It needs the app running locally, so schedule it on your machine. `/resonator:setup-resonator` offers `/loop 24h /resonator:maintain-verification-skill verify-<app>` in an open session, or shows a crontab line for you to add.
 
 ## Self-review
 
-`/astack:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, and `review-performance`. `zhezhi` joins only when the diff touches UI files. The lead verifies each finding, fixes only those with a concrete failure scenario, pushes, and posts one PR comment with every finding and its verdict. The PR summary links that comment.
+`/resonator:pr-review` runs read-only reviewers in parallel: `review-correctness`, `review-security`, `review-api`, and `review-performance`. `zhezhi` joins only when the diff touches UI files. The lead verifies each finding, fixes only those with a concrete failure scenario, pushes, and posts one PR comment with every finding and its verdict. The PR summary links that comment.
 
 Set each seat's model with `node <plugin root>/scripts/config.ts set models.review-security '{"model":"opus"}'`.
 
 ## Heavier checks
 
-- `/astack:interrogate` for a contested design: adversarial reviewers try to break it.
-- `/astack:blast-radius` for what a change could break elsewhere.
-- `/astack:benchmark-checklist` before you report a measurement.
+- `/resonator:interrogate` for a contested design: adversarial reviewers try to break it.
+- `/resonator:blast-radius` for what a change could break elsewhere.
+- `/resonator:benchmark-checklist` before you report a measurement.
 
 ## CI
 
