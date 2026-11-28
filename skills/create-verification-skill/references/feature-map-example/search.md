@@ -35,7 +35,7 @@ Search lets a signed-in user find notes by title or body text, open a matching n
 - **Shared URL.** `notes-cli open "/notes?q=grocery"`. The dialog opens with `grocery` in the searchbox and `Grocery list` in the results.
 - **Empty state.** `notes-cli fill "searchbox:Search notes" "volcano"`, then `notes-cli wait --text "No matching notes"`. The status appears after the search completes.
 - **Clear query.** `notes-cli click "button:Clear search"`. The searchbox is empty, the URL is `/notes`, and `region:Recent notes` replaces the result list.
-- **API match.** `curl -sS -i -b .resonator/verify/cookies.txt "http://127.0.0.1:$PORT/api/notes/search?q=quarterly"`. Status `200` and an array with one note titled `Quarterly plan`.
+- **API match.** `notes-cli http GET "/api/notes/search?q=quarterly" --expect 200`. An array with one note titled `Quarterly plan`.
 - **API miss.** The same with `q=volcano`. Status `200` and the body is `[]`.
 - **Proof.** `notes-cli open "/notes?q=quarterly"`, `notes-cli snapshot --out .resonator/evidence/$BRANCH/search.aria.txt`, `notes-cli screenshot --out .resonator/evidence/$BRANCH/search.png`, `notes-cli console`. Both artifacts identify Notes, the query, and `Quarterly plan`.
 

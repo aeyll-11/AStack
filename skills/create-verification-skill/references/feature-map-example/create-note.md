@@ -31,10 +31,10 @@ Create note lets a signed-in user save a titled note from the `/notes` page or t
 - **Empty title.** `notes-cli click "button:Save note"`. The snapshot shows an alert `Title is required` and the URL stays `/notes/new`.
 - **Enter content.** `notes-cli fill "textbox:Title" "Release checklist"`, then `notes-cli fill "textbox:Body" "Tag and publish"`. The alert is gone from the snapshot.
 - **Save note.** `notes-cli click "button:Save note"`, then `notes-cli wait --text "Note saved"`. The URL becomes `/notes/<id>` and the heading reads `Release checklist`.
-- **Confirm persistence.** `notes-cli reload`, then `notes-cli snapshot`. The editor shows both saved values. Then `curl -sS -i -b .resonator/verify/cookies.txt "http://127.0.0.1:$PORT/api/notes?title=Release%20checklist"`. Status `200` and one note with body `Tag and publish`.
+- **Confirm persistence.** `notes-cli reload`, then `notes-cli snapshot`. The editor shows both saved values. Then `notes-cli http GET "/api/notes?title=Release%20checklist" --expect 200`. One note with body `Tag and publish`.
 - **Cancel draft.** `notes-cli click "button:New note"`, `notes-cli fill "textbox:Title" "Discard me"`, `notes-cli click "button:Cancel"`. The URL returns to `/notes` and `testid:notes-list` has no `Discard me` link.
-- **API entry.** `curl -sS -i -b .resonator/verify/cookies.txt -X POST "http://127.0.0.1:$PORT/api/notes" -H "content-type: application/json" -d '{"title":"API note","body":"Created over HTTP"}'`. Status `201` and the body has the new `id` and title.
-- **No session.** The same request without `-b`. Status `401`, and `notes-cli open /notes` shows no note titled `x`.
+- **API entry.** `notes-cli http POST /api/notes --json '{"title":"API note","body":"Created over HTTP"}' --expect 201 --out .resonator/evidence/$BRANCH/create-note-api.json`. The body has the new `id` and title.
+- **No session.** The same request with `--header "cookie:" --expect 401`, which overrides the jar. `notes-cli open /notes` then shows no new note.
 - **Proof.** `notes-cli open /notes`, `notes-cli snapshot --out .resonator/evidence/$BRANCH/create-note.aria.txt`, `notes-cli screenshot --out .resonator/evidence/$BRANCH/create-note.png`, `notes-cli console`. Both artifacts show `Release checklist` and `API note`, and `console` reports `errors=0`.
 
 ## Gotchas
