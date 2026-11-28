@@ -1,3 +1,5 @@
+> Historical: written when the plugin was named AStack; it is now Resonator.
+
 # AStack — design
 
 Date: 2026-11-27

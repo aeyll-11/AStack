@@ -1,0 +1,12 @@
+# Worktree cleanup
+
+This is the one playbook that deletes user state with no code review to catch a slip, so the gates below are the review.
+
+1. **Snapshot and audit.** Record `df -h .`. List worktrees from `git worktree list --porcelain`, never from hand-typed paths, so you catch ones outside `.worktrees/`, Resonator's slot dir (**principle-encode-lessons-in-structure**). For each, record size (`du -sh`), last commit age, merge state against the PR base (`git branch --merged origin/<base>`), uncommitted work (`git -C <path> status --porcelain`), and PR state (`gh pr list --head <branch> --state all --json number,state`). Suggest a bucket: `safe` (merged or closed, clean), `wip:N` (N tracked uncommitted edits), `scratch:N` (untracked only), or `in-use`.
+2. **The bucket is advice, not permission.** A worktree with an open PR, a running dev server on its slot port, or a live agent is in use. Cross-check every candidate against the active task list and running agents (**principle-prove-it-works**).
+3. **Verify usage before deleting.** For anything you doubt, fan `Explore` subagents ("do not edit files") over the recent transcripts in `~/.claude/projects/<slug>/` to report whether a session touching that worktree is still ongoing (**principle-guard-the-context-window**, transcripts are bulk). Arena runs and repro trees live in sibling worktrees and are in use even when no PR names them.
+4. **Pause on irreversible loss.** Removing a clean worktree is recoverable from its branch. Uncommitted work is gone. Show the `wip` diff and get a decision first. `scratch:N` is untracked throwaway, safe to drop, but name the files. Per Autonomy, clean, merged, and not-in-use proceeds. `wip` and in-use pause.
+5. **Prune the confirmed set.** Per path, `git worktree remove <path>`, adding `--force` only for confirmed `scratch` trees. If the dir survives on ignored build artifacts (`node_modules`, `.nuxt`, `.next`, `dist`), `rm -rf` it. Then `git worktree prune`. Branch refs survive, so no commits are lost. Confirm with `df -h .` and `git worktree list`.
+6. **Other reclaimers, when asked.** Package caches (`npm cache verify`, `pnpm store prune`, `yarn cache clean`) and Playwright browsers no version still uses. Clear only caches the user has not said to keep.
+
+**Reply:** `df -h .` before and after with space reclaimed, the worktrees pruned, and a one-line reason for each held back (in-use by which session or PR, or uncommitted work).

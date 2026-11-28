@@ -1,0 +1,12 @@
+{
+  "name": "resonator",
+  "description": "Resonator plugin marketplace.",
+  "owner": { "name": "Idriss" },
+  "plugins": [
+    {
+      "name": "resonator",
+      "source": "./",
+      "description": "Rigorous JS/TS web engineering workflows: spec or issue to a verified, self-reviewed, green PR."
+    }
+  ]
+}
