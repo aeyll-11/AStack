@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { findViolations, parseCommitCommand } from "../scripts/commit-guard.ts";
@@ -73,6 +73,37 @@ test("Generated with Claude Code line is denied", () => {
 
 test("--trailer with an AI co-author is denied", () => {
   assert.equal(check(`git commit -m x --trailer "Co-authored-by: Copilot <c@github.com>"`).length, 1);
+});
+
+const FOOTER = "🤖 Generated with [Claude Code](https://claude.com/claude-code)";
+
+test("gh pr create --body-file with a footer is denied", () => {
+  const dir = mkdtempSync(join(tmpdir(), "cg-"));
+  const f = join(dir, "body.md");
+  writeFileSync(f, `## Why\n\nx\n\n${FOOTER}\n`);
+  const cmd = `gh pr create --draft --title "feat: x" --body-file ${f}`;
+  assert.equal(check(cmd, { [f]: `## Why\n\n${FOOTER}\n` }).length, 1);
+});
+
+test("gh pr create --body with a footer is denied", () => {
+  assert.equal(check(`gh pr create --title t --body "Why\n\n${FOOTER}"`).length, 1);
+  assert.equal(check(`gh pr edit 3 -b "x" -b "${AI}"`).length, 1);
+});
+
+test("gh pr create with a clean body is allowed", () => {
+  assert.deepEqual(check(`gh pr create --title t --body "## Why\n\nclean"`), []);
+  assert.deepEqual(check(`gh pr create --title t -F b.md`, { [resolve("b.md")]: "clean\n" }), []);
+});
+
+test("gh pr view is allowed", () => {
+  assert.deepEqual(check(`gh pr view 3 --json body`), []);
+});
+
+test("gh pr comment and gh issue comment get the same check", () => {
+  const f = resolve("c.md");
+  assert.equal(check(`gh pr comment 3 --body-file c.md`, { [f]: `done\n${FOOTER}\n` }).length, 1);
+  assert.equal(check(`gh issue comment 3 --body "${AI}"`).length, 1);
+  assert.deepEqual(check(`gh issue comment 3 --body "fine"`), []);
 });
 
 const script = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts", "commit-guard.ts");

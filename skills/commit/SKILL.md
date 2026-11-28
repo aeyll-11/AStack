@@ -18,6 +18,7 @@ Every commit carries the current git user as its only author. A `PreToolUse` hoo
 
 - Never add a `Co-Authored-By:` line naming Claude, Anthropic, or any AI model.
 - Never add "Generated with Claude Code" or a similar line.
+- PR bodies and PR comments (`gh pr create`, `gh pr edit`, `gh pr comment`, `gh issue comment`) carry no AI attribution footer either: no "Generated with Claude Code" line and no AI `Co-Authored-By:`. The commit guard denies them.
 - Human co-authors the user names explicitly are allowed.
 
 ## Message
