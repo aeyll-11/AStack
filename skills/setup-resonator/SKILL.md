@@ -17,6 +17,16 @@ Walk the user through Resonator's configuration. **The user chooses every model.
 
 Ask with AskUserQuestion. A call takes at most 4 questions and each question takes 2 to 4 options, so batch in groups of up to 4. The built-in "Other" choice carries free text. Never write a value the user didn't give.
 
+## 0. Confirm the target repo
+
+Project-scope writes (`--project` config, `.claude/settings.json`) land in the repo the session sits in, which may not be the repo the user means. Before any of them:
+
+1. Run `git rev-parse --show-toplevel` and `git remote get-url origin`. Print the top-level path and the `origin` slug (`owner/name`, or "no origin").
+2. Confirm with AskUserQuestion: "Set up Resonator for this repo?" with the path and slug in the question, options "Yes, this repo" and "No, another path" ("Other" carries the path).
+3. If cwd is not a git repo, or the user picked another path, ask for the target repo's path (free text), check it with `git -C <path> rev-parse --show-toplevel`, and confirm that. Then run every project-scope command in this skill with `cd <path> &&` in front: `config.ts ... --project`, `detect.ts`, the `.claude/skills/verify-*` lookup, and the step 8 reads and writes of `.claude/settings.json`.
+
+User-scope writes (models, notify, `routerHook`, `configured`) do not depend on the repo. Write nothing project-scoped until the user confirms.
+
 ## 1. Detect packs
 
 Run `node <plugin root>/scripts/detect.ts`. It prints a JSON array such as `["nuxt","node"]`. Show the packs, or say none were detected. They need no answer. The router reads the matching **pack-<p>** skill for each one.
@@ -116,9 +126,12 @@ Broad entries (default set):
 - `Bash(<pm>:*)` where `<pm>` follows the lockfile: `pnpm-lock.yaml` is `pnpm`, `yarn.lock` is `yarn`, `bun.lock` or `bun.lockb` is `bun`, otherwise `npm`.
 - `Bash(node:*)`
 - `Bash(npx playwright:*)`
+- `Bash(node .claude/skills/verify-*/scripts/*)`, the generated driver CLI, so verify runs do not prompt. The narrow set keeps it too.
 - `Write(.claude/skills/verify-*/**)` and `Edit(.claude/skills/verify-*/**)`, so the verification skills can be generated and maintained. Say that Claude Code may still refuse writes under `.claude/` in a headless run whatever the rule says; the skills then stage under `.resonator/verify/staged/` and tell the user the copy command.
 
-State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes merging a PR, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` (the plugin's own scripts, with the real absolute path). The user picks broad or narrow.
+State plainly what these allow: `node:*` and `<pm>:*` run arbitrary scripts, `gh:*` includes merging a PR, and `git:*` includes force-push. Offer narrower alternatives as a choice with AskUserQuestion: replace `Bash(gh:*)` with `Bash(gh pr:*)`, `Bash(gh issue:*)`, `Bash(gh run:*)`, `Bash(gh api:*)`, and replace `Bash(node:*)` with `Bash(node <plugin root>/scripts/*)` and keep `Bash(node .claude/skills/verify-*/scripts/*)`. The user picks broad or narrow.
+
+Version-free plugin path. The marketplace install puts the plugin at `~/.claude/plugins/cache/<marketplace>/resonator/<version>/`, and a rule with the version in it stops matching silently after an upgrade. Permission rules do not expand `${CLAUDE_PLUGIN_ROOT}` or `~` (tested with `claude -p`: both left the command unapproved), but `*` inside the path does match, so write the rule with the absolute path and the final version segment replaced by `*`: `Bash(node /Users/me/.claude/plugins/cache/<marketplace>/resonator/*/scripts/*)`. Use the real home directory. If `<plugin root>` is not under `plugins/cache/` (a `--plugin-dir` checkout), there is no version segment: use the absolute path as is.
 
 In every case also add these to `permissions.deny`, because Resonator never merges and never force-pushes:
 
@@ -130,7 +143,7 @@ Merge into the existing file and never drop existing entries or other keys. Skip
 
 ## 9. Competing plugins
 
-Run `claude plugin list`. Name any enabled workflow plugin whose process skills auto-trigger, such as superpowers, agent-skills, or similar. They compete with Resonator's router. For each, give the command `claude plugin disable <name>`. **Never run it yourself.** The user decides. If the command fails or lists none, say so in a line.
+Run `claude plugin list --json`. It prints an array of `{id: "<name>@<marketplace>", enabled: true|false, version, scope, ...}`. Parse that. If the flag is rejected (older Claude Code), run `claude plugin list` and parse the text instead: each plugin starts with a line `❯ <name>@<marketplace>`, and a following `Status: ✔ enabled` or `Status: ✘ disabled` line gives its state. Name any enabled workflow plugin whose process skills auto-trigger, such as superpowers, agent-skills, or similar. They compete with Resonator's router. For each, give the command `claude plugin disable <name>`. **Never run it yourself.** The user decides. If the command fails or lists none, say so in a line.
 
 ## 10. Finish
 
