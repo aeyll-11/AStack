@@ -1,6 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -183,4 +183,56 @@ test("a tracked verify skill is left to git", async () => {
   const slot = await createSlot({ repoRoot: repo, branch: "vs-tracked", slot: 0, basePort: 3100 });
   assert.deepEqual(slot.verifySkills, []);
   assert.equal(readFileSync(join(slot.path, ".claude", "skills", "verify-notes", "SKILL.md"), "utf8"), "committed\n");
+});
+
+test("removeSlot refuses a slot with uncommitted edits and leaves it in place", async () => {
+  const repo = makeRepo(false);
+  const slot = await createSlot({ repoRoot: repo, branch: "dirty/edit", slot: 0, basePort: 3100 });
+  writeFileSync(join(slot.path, "a.txt"), "changed\n");
+  assert.throws(() => removeSlot(repo, "dirty/edit"), /uncommitted changes:\n M a\.txt[\s\S]*--force/);
+  assert.equal(readFileSync(join(slot.path, "a.txt"), "utf8"), "changed\n");
+});
+
+test("removeSlot refuses a slot with a new untracked file", async () => {
+  const repo = makeRepo(false);
+  const slot = await createSlot({ repoRoot: repo, branch: "dirty-new", slot: 0, basePort: 3100 });
+  writeFileSync(join(slot.path, "notes.md"), "draft\n");
+  assert.throws(() => removeSlot(repo, "dirty-new"), /notes\.md/);
+  assert.ok(existsSync(join(slot.path, "notes.md")));
+});
+
+test("removeSlot with force removes a dirty slot", async () => {
+  const repo = makeRepo(false);
+  const slot = await createSlot({ repoRoot: repo, branch: "dirty-force", slot: 0, basePort: 3100 });
+  writeFileSync(join(slot.path, "a.txt"), "changed\n");
+  removeSlot(repo, "dirty-force", { force: true });
+  assert.ok(!existsSync(slot.path));
+});
+
+test("removeSlot treats files createSlot copied in, unchanged, as clean", async () => {
+  const repo = makeRepo(true);
+  mkdirSync(join(repo, ".resonator"));
+  writeFileSync(join(repo, ".resonator", "config.json"), "{}\n");
+  mkdirSync(join(repo, ".claude", "skills", "verify-notes"), { recursive: true });
+  writeFileSync(join(repo, ".claude", "skills", "verify-notes", "SKILL.md"), "root\n");
+  const slot = await createSlot({ repoRoot: repo, branch: "seeded", slot: 0, basePort: 3100 });
+  removeSlot(repo, "seeded");
+  assert.ok(!existsSync(slot.path));
+  const edited = await createSlot({ repoRoot: repo, branch: "seeded-edit", slot: 0, basePort: 3100 });
+  writeFileSync(join(edited.path, ".claude", "skills", "verify-notes", "SKILL.md"), "slot edit\n");
+  assert.throws(() => removeSlot(repo, "seeded-edit"), /verify-notes\/SKILL\.md/);
+});
+
+test("worktree.ts remove needs --force for a dirty slot", async () => {
+  const repo = makeRepo(false);
+  const slot = await createSlot({ repoRoot: repo, branch: "cli-dirty", slot: 0, basePort: 3100 });
+  writeFileSync(join(slot.path, "a.txt"), "changed\n");
+  const cli = join(import.meta.dirname, "..", "scripts", "worktree.ts");
+  const refused = spawnSync(process.execPath, [cli, "remove", "--branch", "cli-dirty"], { cwd: repo, encoding: "utf8" });
+  assert.equal(refused.status, 1);
+  assert.match(refused.stderr, /uncommitted changes/);
+  assert.ok(existsSync(slot.path));
+  const forced = spawnSync(process.execPath, [cli, "remove", "--branch", "cli-dirty", "--force"], { cwd: repo, encoding: "utf8" });
+  assert.equal(forced.status, 0, forced.stderr);
+  assert.ok(!existsSync(slot.path));
 });

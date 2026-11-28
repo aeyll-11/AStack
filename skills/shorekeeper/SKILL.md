@@ -38,7 +38,7 @@ It prints one line, such as `{"state":"red","head":"9f3c2e1…","failing":[{"nam
 - **green.** Return `green`.
 - **red.** If `failing` is empty, return `escalated` and say GitHub refuses the merge while every visible check passes. If `encore` is at or above the retry cap, Encore is spent. Return `escalated`. Otherwise run Encore (step 3).
 - **conflict.** Run the conflict pass (step 4).
-- **closed.** Someone closed or merged the PR outside this loop. Clean up its slot, then return `closed`. Take the head branch from `gh pr view <n> --json headRefName -q .headRefName` and find the slot path from `git worktree list --porcelain`. Only when that path is under `.worktrees/` and `git -C <path> status --porcelain` prints nothing, run `node <plugin root>/scripts/worktree.ts remove --branch <head>`. Otherwise keep the slot and report its path and why.
+- **closed.** Someone closed or merged the PR outside this loop. Clean up its slot, then return `closed`. Take the head branch from `gh pr view <n> --json headRefName -q .headRefName` and find the slot path from `git worktree list --porcelain`. When that path is under `.worktrees/`, run `node <plugin root>/scripts/worktree.ts remove --branch <head>`, never with `--force`. It refuses a slot with uncommitted changes, exits 1, and lists them. Then keep the slot and report its path and the files it listed.
 
 ## 3. Encore
 
