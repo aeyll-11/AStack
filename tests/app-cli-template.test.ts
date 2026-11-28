@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { createServer } from "node:http";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 interface Target {
@@ -11,7 +15,19 @@ interface Target {
 interface Parsed {
   cmd: string;
   args: string[];
-  flags: Record<string, string | boolean>;
+  flags: Record<string, string | boolean | string[]>;
+}
+interface HttpRequest {
+  method: string;
+  url: string;
+  headers: Record<string, string>;
+  body?: string;
+}
+interface HttpResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, string>;
+  body: string;
 }
 interface Config {
   app: string;
@@ -34,6 +50,12 @@ interface CliModule {
   withPort(s: string, port: number): string;
   parsePort(v: unknown): number;
   isOurProcess(ps: { command: string; started: string } | null, expect: { contains?: string[]; started?: string }): boolean;
+  expand(s: string, vars: { port: number; base: string }): string;
+  parseHttpArgs(args: string[], flags: Parsed["flags"], base: string, readFile?: (p: string) => string): HttpRequest;
+  jarCookies(text: string, url: string, nowSec?: number): string;
+  expectMatches(spec: string, status: number): boolean;
+  httpEvidence(req: HttpRequest, res: HttpResponse): { request: HttpRequest & { body: unknown }; status: number; statusText: string; headers: Record<string, string>; body: unknown };
+  httpLine(status: number, body: string, max?: number): string;
 }
 
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
@@ -164,3 +186,160 @@ test("isOurProcess never matches a gone process or an empty expectation", () => 
   assert.equal(cli.isOurProcess({ command: "node a", started: "x" }, {}), false);
   assert.equal(cli.isOurProcess({ command: "node a", started: "" }, { started: "" }), false);
 });
+
+test("parseArgs collects every --header into a list", () => {
+  assert.deepEqual(cli.parseArgs(["http", "GET", "/x", "--header", "a:1", "--header=b: 2"]).flags, { header: ["a:1", "b: 2"] });
+  assert.deepEqual(cli.parseArgs(["http", "GET", "/x", "--header", "a:1"]).flags, { header: ["a:1"] });
+});
+
+test("expand substitutes {port} and {baseUrl}", () => {
+  assert.equal(cli.expand("curl {baseUrl}/todos && echo {port}", { port: 3555, base: "http://127.0.0.1:3555" }), "curl http://127.0.0.1:3555/todos && echo 3555");
+  assert.equal(cli.expand("PORT={port} x --port {port}", { port: 3101, base: "" }), "PORT=3101 x --port 3101");
+});
+
+const base = "http://127.0.0.1:3555";
+
+test("parseHttpArgs builds a GET with an upper-cased method", () => {
+  assert.deepEqual(cli.parseHttpArgs(["get", "/health?x=1"], {}, base), { method: "GET", url: `${base}/health?x=1`, headers: {} });
+});
+
+test("parseHttpArgs sends --json as the body with a JSON content type", () => {
+  const r = cli.parseHttpArgs(["POST", "/todos"], { json: '{"title":"x"}' }, base);
+  assert.equal(r.body, '{"title":"x"}');
+  assert.equal(r.headers["content-type"], "application/json");
+});
+
+test("parseHttpArgs sends --json unchecked, so a malformed body can be proven", () => {
+  assert.equal(cli.parseHttpArgs(["POST", "/todos"], { json: "{bad" }, base).body, "{bad");
+});
+
+test("parseHttpArgs reads --json-file through the reader", () => {
+  const r = cli.parseHttpArgs(["PUT", "/todos/1"], { "json-file": "body.json" }, base, (p) => (p === "body.json" ? '{"a":1}' : ""));
+  assert.equal(r.body, '{"a":1}');
+  assert.equal(r.headers["content-type"], "application/json");
+});
+
+test("parseHttpArgs refuses --json with --json-file", () => {
+  assert.throws(() => cli.parseHttpArgs(["POST", "/x"], { json: "{}", "json-file": "a.json" }, base, () => "{}"), /either --json or --json-file/);
+});
+
+test("parseHttpArgs adds --header values, which override the defaults", () => {
+  const r = cli.parseHttpArgs(["POST", "/x"], { json: "{}", header: ["X-Trace: abc", "content-type:text/plain"] }, base);
+  assert.deepEqual(r.headers, { "content-type": "text/plain", "x-trace": "abc" });
+  assert.throws(() => cli.parseHttpArgs(["GET", "/x"], { header: ["nocolon"] }, base), /k:v/);
+});
+
+test("parseHttpArgs refuses another origin, a bad method, and missing args", () => {
+  assert.throws(() => cli.parseHttpArgs(["GET", "https://example.com/x"], {}, base), /not this app/);
+  assert.throws(() => cli.parseHttpArgs(["G ET", "/x"], {}, base), /method/);
+  assert.throws(() => cli.parseHttpArgs(["GET"], {}, base), /usage: http/);
+});
+
+test("jarCookies reads a Netscape jar for the request host", () => {
+  const jar = [
+    "# Netscape HTTP Cookie File",
+    "127.0.0.1\tFALSE\t/\tFALSE\t0\tsid\tabc",
+    "#HttpOnly_127.0.0.1\tFALSE\t/\tFALSE\t0\tcsrf\tt1",
+    "other.test\tFALSE\t/\tFALSE\t0\tnope\t1",
+    "127.0.0.1\tFALSE\t/\tFALSE\t100\told\tgone",
+    "",
+  ].join("\n");
+  assert.equal(cli.jarCookies(jar, `${base}/todos`, 1000), "sid=abc; csrf=t1");
+  assert.equal(cli.jarCookies("", `${base}/todos`), "");
+});
+
+test("expectMatches takes an exact status, a class, or a list", () => {
+  assert.equal(cli.expectMatches("201", 201), true);
+  assert.equal(cli.expectMatches("201", 200), false);
+  assert.equal(cli.expectMatches("2xx", 204), true);
+  assert.equal(cli.expectMatches("4xx", 500), false);
+  assert.equal(cli.expectMatches("200,204", 204), true);
+  assert.throws(() => cli.expectMatches("ok", 200), /--expect/);
+});
+
+test("httpEvidence records request, status, headers and body, parsing JSON bodies", () => {
+  const req = { method: "POST", url: `${base}/todos`, headers: { "content-type": "application/json" }, body: '{"title":"x"}' };
+  const res = { status: 201, statusText: "Created", headers: { "content-type": "application/json" }, body: '{"id":1,"title":"x"}' };
+  assert.deepEqual(cli.httpEvidence(req, res), {
+    request: { method: "POST", url: `${base}/todos`, headers: { "content-type": "application/json" }, body: { title: "x" } },
+    status: 201,
+    statusText: "Created",
+    headers: { "content-type": "application/json" },
+    body: { id: 1, title: "x" },
+  });
+  const html = cli.httpEvidence({ method: "GET", url: base, headers: {} }, { status: 400, statusText: "Bad Request", headers: {}, body: "<pre>boom</pre>" });
+  assert.equal(html.body, "<pre>boom</pre>");
+  assert.equal(html.request.body, null);
+});
+
+test("httpLine prints status and body on one truncated line", () => {
+  assert.equal(cli.httpLine(200, '{"ok":true}'), '200 {"ok":true}');
+  assert.equal(cli.httpLine(400, "a\n  b\n"), "400 a b");
+  const long = cli.httpLine(200, "x".repeat(500), 20);
+  assert.equal(long, `200 ${"x".repeat(20)}... (500 bytes)`);
+  assert.equal(cli.httpLine(204, ""), "204");
+});
+
+test("parseConfigBlock accepts auth: null and rootMarker: null for an API with no pages", () => {
+  const c = cli.parseConfigBlock(block(JSON.stringify({ ...minimal, rootMarker: null, auth: null })));
+  assert.equal(c.rootMarker, null);
+  assert.equal(c.auth, null);
+});
+
+// Writes a filled copy of the template into a temp app root, ready to run as a CLI.
+function writeFilled(config: object): { file: string; env: NodeJS.ProcessEnv } {
+  const root = mkdtempSync(join(tmpdir(), "app-cli-"));
+  const dir = join(root, ".claude/skills/verify-notes/scripts");
+  mkdirSync(dir, { recursive: true });
+  const filled = `/* resonator-config\n${JSON.stringify(config)}\nresonator-config */`;
+  const file = join(dir, "notes-cli.mjs");
+  writeFileSync(file, readFileSync(templatePath, "utf8").replace(/\/\* resonator-config\n[\s\S]*?\nresonator-config \*\//, () => filled));
+  return { file, env: { ...process.env, APP_ROOT: root } };
+}
+
+function runFilled(config: object, argv: string[]) {
+  const { file, env } = writeFilled(config);
+  return spawnSync(process.execPath, [file, ...argv], { encoding: "utf8", env });
+}
+
+test("login with auth: null prints skip and exits 0", () => {
+  const r = runFilled({ ...minimal, port: 3997, auth: null, rootMarker: null }, ["login"]);
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(r.stdout.trim(), "skip no auth");
+});
+
+test("doctor prints seed.check with placeholders substituted and no auth line when auth is null", () => {
+  const seed = { command: "true", check: "test {port} = 3998 && test {baseUrl} = http://127.0.0.1:3998" };
+  const r = runFilled({ ...minimal, port: 3998, auth: null, rootMarker: null, seed }, ["doctor"]);
+  assert.match(r.stdout, /^ok seed test 3998 = 3998 && test http:\/\/127\.0\.0\.1:3998 = http:\/\/127\.0\.0\.1:3998$/m);
+  assert.doesNotMatch(r.stdout, /\{port\}|\bauth\b/);
+  assert.equal(r.status, 1);
+});
+
+test("http needs no Playwright and exits 1 on an expect mismatch", async () => {
+  const server = createServer((req, res) => { res.statusCode = req.url === "/health" ? 200 : 404; res.setHeader("content-type", "application/json"); res.end('{"status":"ok"}'); });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const cfg = { ...minimal, port, auth: null, rootMarker: null };
+    const ok = await runAsync(cfg, ["http", "GET", "/health", "--expect", "200"]);
+    assert.equal(ok.status, 0, ok.stderr);
+    assert.equal(ok.stdout.trim(), '200 {"status":"ok"}');
+    const bad = await runAsync(cfg, ["http", "GET", "/nope", "--expect", "200"]);
+    assert.equal(bad.status, 1);
+    assert.match(bad.stderr, /expected 200, got 404/);
+  } finally {
+    server.close();
+  }
+});
+
+// The test server runs in this process, so the CLI must run without blocking the event loop.
+async function runAsync(config: object, argv: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  const { file, env } = writeFilled(config);
+  const child = spawn(process.execPath, [file, ...argv], { env });
+  let stdout = "", stderr = "";
+  child.stdout.on("data", (d: Buffer) => (stdout += d));
+  child.stderr.on("data", (d: Buffer) => (stderr += d));
+  const status = await new Promise<number | null>((r) => child.on("close", r));
+  return { status, stdout, stderr };
+}

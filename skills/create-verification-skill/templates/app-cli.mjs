@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Verification driver for this app. Generated from Resonator's app-cli template.
 // Every command and its use is documented in ../SKILL.md. When the app changes, edit the config block, not the code.
+// "auth": null for an app with no sign-in (login prints "skip no auth"). "rootMarker": null for an app with no pages (no marker check).
+// {port} and {baseUrl} are substituted in baseUrl, launch, teardown, and seed.
 /* resonator-config
 {
   "app": "<fill: app name, e.g. notes>",
@@ -32,6 +34,7 @@ const ROLES = new Set(("alert alertdialog button checkbox cell columnheader comb
   "listbox main menu menubar menuitem menuitemcheckbox menuitemradio navigation option progressbar radio radiogroup region row " +
   "rowheader search searchbox slider spinbutton status switch tab table tablist tabpanel textbox toolbar tooltip tree treeitem").split(" "));
 const BOOL_FLAGS = new Set(["headed", "idle", "all"]);
+const LIST_FLAGS = new Set(["header"]);
 const STEP_ACTIONS = new Set(["fill", "click", "press"]);
 
 export function parseArgs(argv) {
@@ -42,10 +45,11 @@ export function parseArgs(argv) {
     const a = rest.shift();
     if (!a.startsWith("--")) { out.args.push(a); continue; }
     const [k, v] = a.slice(2).split(/=(.*)/s);
-    if (v !== undefined) out.flags[k] = v;
-    else if (BOOL_FLAGS.has(k)) out.flags[k] = true;
-    else if (!rest.length || rest[0].startsWith("--")) throw new Error(`--${k} needs a value`);
-    else out.flags[k] = rest.shift();
+    let val = v;
+    if (val === undefined && BOOL_FLAGS.has(k)) val = true;
+    else if (val === undefined && (!rest.length || rest[0].startsWith("--"))) throw new Error(`--${k} needs a value`);
+    else if (val === undefined) val = rest.shift();
+    out.flags[k] = LIST_FLAGS.has(k) ? [...(out.flags[k] ?? []), val] : val;
   }
   return out;
 }
@@ -63,11 +67,58 @@ export function parseTarget(spec) {
 }
 
 export const withPort = (s, port) => s.replaceAll("{port}", String(port));
+export const expand = (s, { port, base }) => withPort(s.replaceAll("{baseUrl}", base), port);
 
 export function parsePort(v) {
   const n = typeof v === "number" ? v : /^\d+$/.test(String(v)) ? Number(v) : NaN;
   if (!Number.isInteger(n) || n < 1 || n > 65535) throw new Error(`port must be an integer in 1..65535, got "${v}"`);
   return n;
+}
+
+const HTTP_USAGE = "usage: http <METHOD> <route> [--json <body>|--json-file <path>] [--header k:v]... [--expect <status>] [--out <path>]";
+
+// --json is sent as given, unchecked, so a malformed body can be proven too.
+export function parseHttpArgs(args, flags, base, readFile = (p) => readFileSync(p, "utf8")) {
+  if (args.length < 2) throw new Error(HTTP_USAGE);
+  const method = args[0].toUpperCase();
+  if (!/^[A-Z]+$/.test(method)) throw new Error(`method "${args[0]}" must be letters only, e.g. GET`);
+  const url = new URL(args[1], base);
+  if (url.origin !== new URL(base).origin) throw new Error(`refusing ${url.origin}: not this app (${base})`);
+  if (flags.json !== undefined && flags["json-file"] !== undefined) throw new Error("pass either --json or --json-file, not both");
+  const body = flags["json-file"] !== undefined ? readFile(flags["json-file"]) : flags.json;
+  const headers = body === undefined ? {} : { "content-type": "application/json" };
+  for (const h of flags.header ?? []) {
+    const i = h.indexOf(":");
+    if (i < 1) throw new Error(`--header "${h}" must be k:v`);
+    headers[h.slice(0, i).trim().toLowerCase()] = h.slice(i + 1).trim();
+  }
+  return { method, url: url.href, headers, ...(body !== undefined && { body }) };
+}
+
+// Netscape cookie jar (what login writes, and what curl -c writes) to a Cookie header for this host.
+export function jarCookies(text, url, nowSec = Date.now() / 1000) {
+  const host = new URL(url).hostname;
+  return text.split("\n").map((l) => l.replace(/^#HttpOnly_/, "")).filter((l) => l && !l.startsWith("#")).map((l) => l.split("\t"))
+    .filter(([domain, , , , expires, name]) => {
+      const d = domain.replace(/^\./, "");
+      return name && (host === d || host.endsWith(`.${d}`)) && !(Number(expires) > 0 && Number(expires) < nowSec);
+    })
+    .map((c) => `${c[5]}=${c[6] ?? ""}`).join("; ");
+}
+
+export function expectMatches(spec, status) {
+  const parts = String(spec).split(",").map((p) => p.trim());
+  if (!parts.every((p) => /^\d{3}$|^[1-5]xx$/i.test(p))) throw new Error(`--expect "${spec}" must be a status (201), a class (2xx), or a list (200,204)`);
+  return parts.some((p) => (/x/i.test(p) ? Math.floor(status / 100) === Number(p[0]) : Number(p) === status));
+}
+
+const asJson = (t) => { if (t === undefined) return null; try { return JSON.parse(t); } catch { return t; } };
+export const httpEvidence = (req, res) => ({ request: { ...req, body: asJson(req.body) }, status: res.status, statusText: res.statusText, headers: res.headers, body: asJson(res.body) });
+
+export function httpLine(status, body, max = 300) {
+  const flat = body.replace(/\s+/g, " ").trim();
+  const shown = flat.length > max ? `${flat.slice(0, max)}... (${Buffer.byteLength(body)} bytes)` : flat;
+  return shown ? `${status} ${shown}` : String(status);
 }
 
 // Pid reuse guard: a recorded pid is ours only if the live process still matches what we recorded.
@@ -171,7 +222,7 @@ async function launch(x) {
   const taken = listeners(x.port);
   if (taken.length) throw new Exit(1, `port ${x.port} is taken by pid ${taken.join(",")} (not ours). Pass --port <free port>`);
   const log = openSync(F.appLog, "a");
-  const child = spawn("sh", ["-c", withPort(x.cfg.launch, x.port)], { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: { ...process.env, PORT: String(x.port) } });
+  const child = spawn("sh", ["-c", expand(x.cfg.launch, x)], { cwd: ROOT, detached: true, stdio: ["ignore", log, log], env: { ...process.env, PORT: String(x.port) } });
   child.unref();
   closeSync(log);
   writeFileSync(F.app, JSON.stringify({ pid: child.pid, port: x.port, started: psInfo(child.pid)?.started ?? "" }));
@@ -195,7 +246,7 @@ async function killApp(x) {
     for (let i = 0; i < 20 && listeners(app.port).length; i++) await sleep(250);
     try { process.kill(-app.pid, "SIGKILL"); } catch {}
   }
-  if (x.cfg.teardown) sh(withPort(x.cfg.teardown, x.port), { PORT: String(x.port) });
+  if (x.cfg.teardown) sh(expand(x.cfg.teardown, x), { PORT: String(x.port) });
   rmSync(F.app, { force: true });
 }
 
@@ -208,7 +259,7 @@ async function doctor(x) {
   check(!!app && owners.length > 0 && owners.every((p) => p === app.pid || pgid(p) === app.pid), "port", `${x.port} listeners=${owners.join(",") || "none"}`);
   const s = await status(x.base + x.cfg.readyPath);
   check(s > 0 && s < 500, "ready", `${x.cfg.readyPath} -> ${s || "no answer"}`);
-  if (x.cfg.seed?.check) check(sh(withPort(x.cfg.seed.check, x.port), { PORT: String(x.port) }) === 0, "seed", x.cfg.seed.check);
+  if (x.cfg.seed?.check) { const c = expand(x.cfg.seed.check, x); check(sh(c, { PORT: String(x.port), BASE_URL: x.base }) === 0, "seed", c); }
   if (x.cfg.auth?.check) {
     const a = existsSync(F.state) ? await status(x.base + x.cfg.auth.check, { headers: { cookie: cookieHeader() } }) : 0;
     check(a >= 200 && a < 300, "auth", existsSync(F.state) ? `${x.cfg.auth.check} -> ${a}` : "no session, run login");
@@ -357,13 +408,31 @@ async function ctlCall(path) {
   }).on("error", bad).end());
 }
 
+// No browser: fetch against the launched app, with the login cookie jar when there is one.
+async function http(x, args, flags, out) {
+  let req;
+  try { req = parseHttpArgs(args, flags, x.base); if (flags.expect !== undefined) expectMatches(flags.expect, 0); } catch (e) { throw new Exit(2, e.message); }
+  const cookie = existsSync(F.jar) ? jarCookies(readFileSync(F.jar, "utf8"), req.url) : "";
+  const res = await fetch(req.url, { method: req.method, headers: { ...(cookie && { cookie }), ...req.headers }, body: req.body, redirect: "manual", signal: AbortSignal.timeout(Number(flags.timeout ?? 10000)) })
+    .catch((e) => { throw new Exit(1, `${req.method} ${req.url}: no answer (${e.cause?.code ?? e.message}). Run doctor`); });
+  const got = { status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers), body: await res.text() };
+  if (flags.out) {
+    const o = out(flags.out);
+    const sent = cookie && !("cookie" in req.headers) ? { ...req, headers: { ...req.headers, cookie: "<from .resonator/verify/cookies.txt>" } } : req;
+    mkdirSync(dirname(o), { recursive: true });
+    writeFileSync(o, `${JSON.stringify(httpEvidence(sent, got), null, 2)}\n`);
+  }
+  say(httpLine(got.status, got.body));
+  if (flags.expect !== undefined && !expectMatches(flags.expect, got.status)) throw new Exit(1, `expected ${flags.expect}, got ${got.status}`);
+}
+
 const need = (v, usage) => { if (v === undefined || v === "") throw new Exit(2, `usage: ${usage}`); return v; };
 
 async function main(argv) {
   const { cmd, args, flags } = parseArgs(argv);
   mkdirSync(DIR, { recursive: true });
   if (cmd === "__serve") return serve(flags);
-  if (cmd === "help") return say("commands: launch doctor start stop open click fill press snapshot screenshot trace console wait reload flag login seed cleanup status. See ../SKILL.md");
+  if (cmd === "help") return say("commands: launch doctor http start stop open click fill press snapshot screenshot trace console wait reload flag login seed cleanup status. See ../SKILL.md");
   const x = context(flags);
   if (["click", "fill"].includes(cmd)) try { parseTarget(need(args[0], `${cmd} <target>`)); } catch (e) { throw e instanceof Exit ? e : new Exit(2, e.message); }
   const out = (p) => resolve(process.cwd(), need(p, `${cmd} --out <path>`));
@@ -411,15 +480,17 @@ async function main(argv) {
         say(`ok flag ${name}=${state}`);
       });
     }
+    case "http": return http(x, args, flags, out);
     case "login": {
-      const auth = x.cfg.auth ?? (() => { throw new Exit(2, "no auth fixture in config"); })();
+      const auth = x.cfg.auth;
+      if (!auth) return say("skip no auth");
       await withPage(x, flags, async (p) => { await open(p, x, auth.route); for (const step of auth.steps) await act(p, x, step); });
       if (auth.check) { const s = await status(x.base + auth.check, { headers: { cookie: cookieHeader() } }); if (s < 200 || s >= 300) throw new Exit(1, `login did not stick: ${auth.check} -> ${s}`); }
       return say(`ok login state=${F.state}`);
     }
     case "seed": {
       if (!x.cfg.seed) throw new Exit(2, "no seed hook in config");
-      const code = sh(withPort(x.cfg.seed.command, x.port), { PORT: String(x.port), BASE_URL: x.base });
+      const code = sh(expand(x.cfg.seed.command, x), { PORT: String(x.port), BASE_URL: x.base });
       if (code !== 0) throw new Exit(1, `seed failed: exit ${code}`);
       return say("ok seed");
     }
