@@ -10,6 +10,7 @@ Every commit carries the current git user as its only author. A `PreToolUse` hoo
 ## Identity
 
 - Author and committer are the current git identity: `git config user.name` and `git config user.email`.
+- The author name is the user's GitHub login, so commits are easy to track. Before the first commit in a repo, compare `git config user.name` with `gh api user --jq .login`. If they differ, tell the user and offer `git config user.name <login>`, set for this repo only and never with `--global`. The email stays whatever the user already has.
 - If either is unset, stop and ask the user to set it. Never invent one.
 - Never pass `--author` with any value other than that identity.
 
