@@ -7,13 +7,13 @@ The shared tail of every code playbook. It takes verified work to a green PR wit
    - `## Why`: the goal, first. A phoebe owner ends it with its `Closes` line.
    - `## Spec`: `<repo>/.resonator/spec/<branch>.md` pasted verbatim. That file already opens with `## Spec` and holds Goal, Acceptance criteria, Guesses, and Open questions as `###` headings.
    - `## What changed`
-   - `## How verified`: the **verify-web** evidence. Text evidence (requests and responses, console output, test output) goes inline.
+   - `## How verified`: the **verify-web** `report.md`. Build the body file from it with `cat`, so its text evidence lands inline without passing through your context.
    - `## Open questions`: only questions raised after the spec, such as arena alternatives you rejected.
 
    Stack follow-ups by base branch.
 3. **Push evidence.** Screenshots and Playwright traces go to the evidence branch: `node <plugin root>/scripts/evidence.ts push --pr <n> <files...>`. It prints links. Put them in `## How verified` with `gh pr edit <n> --body-file <file>`. Long logs and run histories go in a file or a PR comment, linked from the body.
-4. **Self-review.** Run the **pr-review** skill on the PR with the playbook's code role. It verifies each finding, fixes the real ones in the slot, pushes, and posts one comment. Keep the comment URL it returns. Rerun the **verify-web** skill on the criteria its fixes touch, and update `## How verified` when the evidence changes.
-5. **Watch CI.** Run the **shorekeeper** skill on the PR with the playbook's code role. Resonator owns this branch. It returns `green`, `escalated`, `conflict`, or `closed`.
+4. **Self-review.** Run the **pr-review** skill on the PR with the playbook's code role. It verifies each finding, fixes the real ones in the slot, pushes, and posts one comment. Keep the comment URL it returns. Rerun **verify-web** on the criteria its fixes touch in a fresh `verify` agent per the router's long-loop rule, and update `## How verified` when the evidence changes.
+5. **Watch CI.** Run the **shorekeeper** skill on the PR with the playbook's code role. Resonator owns this branch. Its watch runs in a `verify` agent per the router's long-loop rule. Encore fixes go to the code role. It returns `green`, `escalated`, `conflict`, or `closed`.
 6. **Notify.** On `closed`, skip to the reply. On `escalated` or `conflict`, leave the PR draft and skip to the summary comment. Name each failing check with its link, or the conflicting base. On `green`:
    - Mark it ready: `gh pr ready <n>`.
    - If `node <plugin root>/scripts/config.ts get notify.requestReview` prints `true`, request review. The login is what `node <plugin root>/scripts/config.ts get notify.reviewer` prints. When that key is unset, use the repo owner from `gh repo view --json owner -q .owner.login`. If the login equals the PR author from `gh pr view <n> --json author -q .author.login`, skip the request, since GitHub rejects a request to review your own PR, and say so in the summary. Otherwise run `gh pr edit <n> --add-reviewer <login>`.

@@ -30,7 +30,7 @@ The Principles section grounds every trigger. In your reply, name each principle
 - Code → name the data shape first. Across a function boundary → **architect**. Fan-out → **swarm**. Bakeoff → **arena**. Contested design → **interrogate**.
 - Prose, your reply included → **unslop**. Docs, PR descriptions, commit messages → **technical-writing**.
 - Before commit → **no-comments**, then **unslop** on the prose in the diff. Every commit follows the **commit** skill.
-- UI change → **verify-web** against the running app. Backend change → **verify-web** over HTTP. "Tests pass" is not verification.
+- UI change → **verify-web** against the running app. Backend change → **verify-web** over HTTP. Both run in a `verify` agent (see Subagents). "Tests pass" is not verification.
 - Review → **pr-review**. CI → **shorekeeper**.
 - A number you measured → **benchmark-checklist**.
 - Bot and reviewer comments → judge each on its merits. Act only on findings with a concrete failure scenario.
@@ -105,6 +105,8 @@ You run the playbook, the task list, and every spawn. Use `resonator:xiangli-yao
 - Panels and review seats: the role their skill names.
 
 **Writers work in the PR slot.** See Mechanics. Never give a code writer `isolation: "worktree"`.
+
+**Long loops leave your context.** Long, mechanical loops (verify, CI watch) run in a `verify`-role agent that returns a summary, not raw output. It works in the PR slot while no writer does, and never edits code, commits, or pushes. You keep every decision and every reply to the user. Its brief and return are the loop skill's own section: **verify-web** §Delegated run, **shorekeeper** §Watch. Playbooks point here.
 
 **You own every agent's work.** Review the diff yourself and write your own summary.
 

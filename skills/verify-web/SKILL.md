@@ -89,4 +89,14 @@ The overall result is the first that applies:
 3. **INCONCLUSIVE ("no real-app criterion")** if the change touches user-facing or runtime code and no `[http]` or `[browser]` row passed. Passing tests alone are proxy verification.
 4. **PASS** otherwise.
 
-Paste text evidence (requests and responses, console output, test output) inline for the PR's `## How verified`. List the image and trace files separately, since those get pushed later.
+Write the table, the overall result, and the text evidence (requests and responses, console output, test output) to `$ev/report.md`. The PR's `## How verified` is built from that file. List the image and trace files separately, since those get pushed later.
+
+## Delegated run
+
+Under the **resonator** router this skill runs in a `verify`-role agent, per the router's long-loop rule. The lead spawns `resonator:xiangli-yao` in the background with no `isolation`, and the `model` and `effort` from `node <plugin root>/scripts/config.ts model verify`. After the `worker.md` line and the goal, the brief gives:
+
+- the absolute `<plugin root>`, the slot path and its port, the spec file path, and the evidence folder (`<slot>/.resonator/evidence/<branch with / as ->`);
+- the criteria to run, when not all, such as the ones a review fix touched;
+- `Run the verify-web skill. Do not edit tracked files, commit, or push.`
+
+The agent returns only the step 6 table, the overall result, the path of `report.md`, the image and trace paths, and the folder of any verification skill it generated. No logs, snapshots, or response bodies. The lead judges the result. It never drives the steps itself. A rerun is a fresh agent with the same brief.
