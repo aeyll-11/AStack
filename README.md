@@ -4,6 +4,31 @@ Resonator is a Claude Code plugin for JS/TS web engineering. Give it a task or a
 
 It is one plugin. It covers understanding the task, a short spec, design, implementation, tests, real-app verification, multi-angle review, fixes, the PR, the CI watch, and the notification.
 
+## Built on PStack
+
+Resonator uses [PStack](https://github.com/cursor/plugins/tree/main/pstack) by Lauren Tan as its base (MIT).
+
+- **Kept from PStack:**
+  - The router-plus-playbooks mode.
+  - The 24 principles.
+  - The generic skills: architect, tdd, interrogate, arena, swarm, how, why, unslop and others.
+  - The verification-skill approach: a feature map plus a driver CLI, maintained daily.
+  - The PR watcher.
+- **Changed:**
+  - Rebuilt for Claude Code only, with no editor-specific features.
+  - Model panels use Claude models only, and you choose the model for each role.
+  - Playbooks are rewritten for JS/TS web work.
+- **Added:**
+  - Spec → PR and Phoebe, the issue loop.
+  - Self PR review with five reviewer agents.
+  - Shorekeeper, which handles CI with Encore retries.
+  - verify-web.
+  - Worktree slots.
+  - The evidence branch.
+  - Nuxt, Node and Bun stack packs.
+  - The commit guard.
+  - setup-resonator.
+
 ## Install
 
 ```
