@@ -16,6 +16,9 @@ The target repo is `aeyll-11/ResonatorTest`, a Node 24 + Express TS todos API, p
 | 8 | create-verification-skill | `Selectors:` and the Helpers rule ("list every command") make no sense for JSON. The map ended up listing 12 browser commands as "exit 3 here". | The feature-map header and Helpers rule are UI-only. | For APIs, `Selectors:` becomes `Contract:` (request and response fields, status codes). Helpers lists only the commands that apply to the surface. | open |
 | 9 | maintain-verification-skill | The live pass is all browser steps (`open`, `click`, `fill`, `screenshot`). | Same UI-first assumption as #5. | Make the live pass surface-aware: APIs drive with `http`. | open |
 | 10 | app-cli template | `doctor` prints the raw `seed.check` string with `{port}` unsubstituted. | Missing template substitution in the doctor output. | Substitute `{port}` before printing. | open |
+| 11 | Spec → PR (opening-a-pr) | The PR body ends with "🤖 Generated with [Claude Code]". The user wants no Claude attribution, and the commit guard only covers commits. | Claude Code's default PR attribution. opening-a-pr has no footer rule. | opening-a-pr and the **commit** skill: PR bodies carry no AI footer. Extend commit-guard to `gh pr create`/`gh pr edit` `--body`/`--body-file`. | open |
+| 12 | Spec → PR, input | The user typed only `add PATCH /todos/:id`. The spec guessed "rename title", since `Todo` is `{id,title}`, labelled the guess, and asked one open question. | n/a: this is the intended no-gate behaviour. | none | ok |
+| 13 | Spec → PR, cleanup | The slot `.worktrees/resonator-patch-todo` remains after the PR goes green. | Slots are kept until the PR closes, and nothing removes one after merge. | Shorekeeper/babysit removes the slot on merge or close. worktree-cleanup covers it too. | open |
 | — | **Product bug found** in ResonatorTest | A malformed JSON body to `POST /todos` returns a 400 **HTML page with a full stack trace**, which leaks internals. | Express's default error handler. | Add a JSON error handler in `src/app.ts`. Good candidate for a Phoebe issue. | found by verification (not a Resonator bug) |
 
 ## Token usage (complexity vs consumption)
@@ -28,6 +31,7 @@ Complexity scale: **S** is a config or doc change, **M** is one endpoint or feat
 |---|---|---|---|---|---|---|---|---|
 | setup-resonator | S | opus (lead), run inline in the controller session | n/a | n/a | n/a | ~14 | ~6 min (user answering) | 6 AskUserQuestion calls. Tokens are mixed into the controller session, so they can't be isolated. |
 | create-verification-skill | M | opus high (xiangli-yao) | 28 | 19,705 | 978,807 (+102,486 write) | 24 | 2m 51s | 4 features mapped, CLI proved end to end, found 1 product bug. Total 1.10M, 89% cache read. |
+| Spec → PR: `add PATCH /todos/:id` (fresh session) | M | opus lead/implementer/reviewers, sonnet perf | 104 | 23,087 | 2,508,610 (+207,492 write) | 56 | 3m 40s | PR #1 is green and ready, with 4 reviewers, 0 findings, and HTTP proof through the CLI. Total 2.74M: main session 1.86M (68%), implementer 0.70M (25%), 4 reviewers + comment-sicko 0.18M (7%). |
 | (tooling) usage script | S | sonnet medium | 18 | 11,129 | 412,042 (+59,271 write) | 10 | 1m 17s | Dev tooling, not a Resonator workflow step. Total 0.48M. |
 
 ### Usage findings
