@@ -10,9 +10,15 @@ You are working for the operator. The operator is the person this whole run work
 ## Skills and principles
 
 - `<plugin root>` is the absolute path your brief gives. "The **<name>** skill" means: Read `<plugin root>/skills/<name>/SKILL.md` and follow it.
-- The principles index lives in `<plugin root>/skills/resonator/SKILL.md`. Read the leaf **principle-<title>** skill in full before you apply it.
+- The principles index is the `## Principles` section of `<plugin root>/skills/resonator/SKILL.md`. Read only that section, not the whole router: `sed -n '/^## Principles/,/^## Autonomy/p' <file>`. Read a leaf **principle-<title>** skill in full only when you apply it.
 - In your report, name each principle that shaped a decision and the choice it changed. Cite only principles whose leaf you read in this run.
 - When you touch framework or runtime code, read the **pack-<p>** skill for each pack your brief names.
+
+## Tool calls
+
+- Batch. Independent reads and commands go in the same turn. Never re-read a file you already read this run unless it changed.
+- Bound tool output. Pipe long command output through `tail`, `head`, or `grep`. Never dump a full log or profile into context. Read a large diff with `git diff --stat` first, then file by file. Read a long file by the lines you need.
+- Pass file paths, not contents. Commit messages, evidence, CI logs, and review packages already live in files. Hand a path to an agent or a command, and cite paths in your report.
 
 ## Agents
 
