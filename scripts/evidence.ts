@@ -4,7 +4,7 @@ import { basename, extname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { GitHubUnavailable, repoSlug, run } from "./lib/git.ts";
 
-const BRANCH = "astack-evidence";
+const BRANCH = "resonator-evidence";
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg"]);
 
 export interface Slug {
@@ -49,9 +49,9 @@ export function pushEvidence(opts: { cwd: string; pr: number; files: string[]; s
   const { cwd, pr } = opts;
   const slug = opts.slug ?? repoSlug(cwd);
   const files = opts.files.map((f) => resolve(cwd, f));
-  for (const f of files) if (!existsSync(f)) throw new Error(`astack: no such file: ${f}`);
+  for (const f of files) if (!existsSync(f)) throw new Error(`resonator: no such file: ${f}`);
 
-  const parent = mkdtempSync(join(tmpdir(), "astack-evidence-"));
+  const parent = mkdtempSync(join(tmpdir(), "resonator-evidence-"));
   const wt = join(parent, "wt");
   let added = false;
   try {

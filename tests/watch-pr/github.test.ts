@@ -405,7 +405,7 @@ printf '%s\\n' '[{"number":42,"headRefName":"feature","baseRefName":"main","isCr
         console.log(JSON.stringify(await new GhGitHubReader().openPullRequests({ owner: "owner", repo: "repo" })));`;
       const child = spawnSync(process.execPath, ["--input-type=module", "-e", program], {
         encoding: "utf8", timeout: 2000,
-        env: { ...process.env, ASTACK_GH: join(directory, "gh") },
+        env: { ...process.env, RESONATOR_GH: join(directory, "gh") },
       });
       assert.equal(child.error, undefined);
       assert.equal(child.status, 0);

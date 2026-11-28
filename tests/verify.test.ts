@@ -37,10 +37,10 @@ test("danglingSkillRefs accepts principle-* folders", () => {
   assert.deepEqual(danglingSkillRefs(files, new Set(["principle-x"])), ["a.md: **principle-y**"]);
 });
 
-test("danglingAgentRefs flags astack:<agent> with no agent file", () => {
-  const files = [{ path: "a.md", text: 'subagent_type: "astack:zhezhi" and astack:nobody and /astack:tdd' }];
-  assert.deepEqual(danglingAgentRefs(files, new Set(["zhezhi"]), new Set()), ["a.md: astack:nobody"]);
-  const labels = [{ path: "b.md", text: "label `astack:needs-info`" }];
+test("danglingAgentRefs flags resonator:<agent> with no agent file", () => {
+  const files = [{ path: "a.md", text: 'subagent_type: "resonator:zhezhi" and resonator:nobody and /resonator:tdd' }];
+  assert.deepEqual(danglingAgentRefs(files, new Set(["zhezhi"]), new Set()), ["a.md: resonator:nobody"]);
+  const labels = [{ path: "b.md", text: "label `resonator:needs-info`" }];
   assert.deepEqual(danglingAgentRefs(labels, new Set(), new Set(["needs-info"])), []);
 });
 

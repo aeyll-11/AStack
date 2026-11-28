@@ -26,7 +26,7 @@ Open a task list with `TaskCreate`, one task per phase, before launching anythin
 
 ## Phase B: Fan out
 
-Spawn all N workers in one message with `subagent_type: "astack:xiangli-yao"`, `isolation: "worktree"`, and the step 3 `model` and `effort`. Subagents run in the background and notify you when they finish. For read-only work, such as exploration or audits, use `subagent_type: "Explore"`, drop the worktree, and put "do not edit files" in the brief.
+Spawn all N workers in one message with `subagent_type: "resonator:xiangli-yao"`, `isolation: "worktree"`, and the step 3 `model` and `effort`. Subagents run in the background and notify you when they finish. For read-only work, such as exploration or audits, use `subagent_type: "Explore"`, drop the worktree, and put "do not edit files" in the brief.
 
 When a worker must start from a non-default branch, tell it to check out that branch first.
 

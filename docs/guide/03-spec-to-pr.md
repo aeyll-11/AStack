@@ -3,12 +3,12 @@
 The `feature` playbook takes a description to a green PR.
 
 ```
-/astack:astack <feature description>
+/resonator:resonator <feature description>
 ```
 
 ## Steps
 
-1. **Slot.** The lead fetches and makes a worktree slot on a new PR branch `astack/<slug>`, cut from trunk. Every later step runs there.
+1. **Slot.** The lead fetches and makes a worktree slot on a new PR branch `resonator/<slug>`, cut from trunk. Every later step runs there.
 2. **Sharpen.** The **spec** skill writes goal, acceptance criteria, labeled guesses, and open questions. There is no human gate. The whole spec goes into the PR's `## Spec`.
 3. **Architect.** The **architect** skill fixes data shape, types, and module boundaries before logic.
 4. **Implement.** An `xiangli-yao` agent writes the code in the slot while the lead waits. Its brief asks for TDD where it is cheap, with tests that assert observable behavior. When several valid shapes exist, the **arena** skill runs competing candidates.

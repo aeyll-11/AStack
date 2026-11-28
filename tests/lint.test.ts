@@ -46,3 +46,10 @@ test("size", () => {
   assert.equal(issues.length, 2);
   assert.ok(issues.every((i) => i.rule === "size"));
 });
+
+test("old-name flags the former plugin name", () => {
+  const issues = lintTree(fx("dirty/old-name"));
+  assert.equal(issues.length, 1);
+  assert.equal(issues[0].rule, "old-name");
+  assert.equal(issues[0].line, 6);
+});

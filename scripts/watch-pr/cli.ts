@@ -54,7 +54,7 @@ Options:
   --pretty                    render human text instead of JSON
   -h, --help                  show this help
 
-Exit 2 with "astack: GitHub unavailable: <reason>" when gh is missing or unauthenticated.
+Exit 2 with "resonator: GitHub unavailable: <reason>" when gh is missing or unauthenticated.
 `;
 class UsageError extends Error {}
 function invalid(flag: string, value: string, reason: string): never {

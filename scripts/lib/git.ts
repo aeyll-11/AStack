@@ -2,12 +2,12 @@ import { execFileSync } from "node:child_process";
 
 export class GitHubUnavailable extends Error {
   constructor(reason: string) {
-    super(`astack: GitHub unavailable: ${reason}`);
+    super(`resonator: GitHub unavailable: ${reason}`);
     this.name = "GitHubUnavailable";
   }
 }
 
-export const ghBin = (): string => process.env.ASTACK_GH ?? "gh";
+export const ghBin = (): string => process.env.RESONATOR_GH ?? "gh";
 
 export function run(cmd: string, args: string[], cwd: string): string {
   try {

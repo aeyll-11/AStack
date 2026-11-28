@@ -155,13 +155,13 @@ describe("GitHub unavailable", () => {
     spawnSync(process.execPath, [CLI, ...ARGS], {
       encoding: "utf8",
       timeout: 10_000,
-      env: { ...process.env, ASTACK_GH: gh },
+      env: { ...process.env, RESONATOR_GH: gh },
     });
 
   it("exits 2 when gh is missing", () => {
-    const child = cli(join(tmpdir(), "astack-no-such-gh", "gh"));
+    const child = cli(join(tmpdir(), "resonator-no-such-gh", "gh"));
     assert.equal(child.status, 2, child.stderr);
-    assert.match(child.stderr, /^astack: GitHub unavailable: gh not found/);
+    assert.match(child.stderr, /^resonator: GitHub unavailable: gh not found/);
     assert.equal(child.stdout, "");
   });
 
@@ -176,7 +176,7 @@ describe("GitHub unavailable", () => {
       );
       const child = cli(gh);
       assert.equal(child.status, 2, child.stderr);
-      assert.match(child.stderr, /^astack: GitHub unavailable: gh is not authenticated/);
+      assert.match(child.stderr, /^resonator: GitHub unavailable: gh is not authenticated/);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

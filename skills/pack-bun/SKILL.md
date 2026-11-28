@@ -1,6 +1,6 @@
 ---
 name: pack-bun
-description: AStack stack pack for Bun projects, including Elysia and Hono servers. Read when the router detects bun.
+description: Resonator stack pack for Bun projects, including Elysia and Hono servers. Read when the router detects bun.
 disable-model-invocation: true
 ---
 

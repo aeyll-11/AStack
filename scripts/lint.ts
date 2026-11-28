@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, basename, dirname } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-export type Rule = "cursor-residue" | "cast-in-public" | "merge-ban" | "frontmatter" | "size";
+export type Rule = "cursor-residue" | "cast-in-public" | "merge-ban" | "frontmatter" | "size" | "old-name";
 export interface LintIssue {
   file: string;
   line: number;
@@ -15,6 +15,7 @@ const CURSOR_CS = /\bCursor\b/;
 const CURSOR_CI = /generalPurpose|bugbot|\.mdc|cursor-team-kit|control-ui|control-cli|gemini-|poteto|pstack-models/i;
 const CAST = ["Jinhsi", "Phoebe", "Shorekeeper", "Encore", "Xiangli Yao", "Verina", "Zhezhi"];
 const CAST_RE = new RegExp(`\\b(${CAST.join("|")})\\b`);
+const OLD_NAME_RE = /\bastack\b/i;
 const MERGE_RE = /gh\s+pr\s+merge/;
 const MERGE_DENY_RE = /Bash\(gh pr merge:\*\)/g;
 
@@ -52,6 +53,7 @@ export function lintTree(root: string): LintIssue[] {
 
     lines.forEach((l, i) => {
       if (CURSOR_CS.test(l) || CURSOR_CI.test(l)) add(i + 1, "cursor-residue", `Cursor residue: ${l.trim()}`);
+      if (OLD_NAME_RE.test(l)) add(i + 1, "old-name", `Old plugin name: ${l.trim()}`);
       if (/^(skills|agents)\//.test(rel) && MERGE_RE.test(l.replace(MERGE_DENY_RE, ""))) add(i + 1, "merge-ban", "gh pr merge is banned");
     });
 
@@ -76,8 +78,8 @@ export function lintTree(root: string): LintIssue[] {
     }
 
     const count = text.endsWith("\n") ? lines.length - 1 : lines.length;
-    if (rel === "skills/astack/SKILL.md" && count > 150) add(count, "size", `${count} lines exceeds 150`);
-    if (/^skills\/astack\/playbooks\/[^/]+\.md$/.test(rel) && count > 60)
+    if (rel === "skills/resonator/SKILL.md" && count > 150) add(count, "size", `${count} lines exceeds 150`);
+    if (/^skills\/resonator\/playbooks\/[^/]+\.md$/.test(rel) && count > 60)
       add(count, "size", `${count} lines exceeds 60`);
   }
   return issues;

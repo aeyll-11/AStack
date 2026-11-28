@@ -51,7 +51,7 @@ export function danglingSkillRefs(docs: readonly Doc[], known: ReadonlySet<strin
 export function danglingAgentRefs(docs: readonly Doc[], agents: ReadonlySet<string>, labels: ReadonlySet<string> = LABEL_SUFFIXES): string[] {
   return scan(
     docs,
-    /(?<![/\w])astack:([a-z][a-z0-9-]*)/g,
+    /(?<![/\w])resonator:([a-z][a-z0-9-]*)/g,
     (m) => !agents.has(m[1] ?? "") && !labels.has(m[1] ?? ""),
     (m) => m[0],
   );
@@ -128,13 +128,13 @@ function toolchain(): void {
 }
 
 function smoke(): void {
-  const tmp = mkdtempSync(join(tmpdir(), "astack-verify-"));
+  const tmp = mkdtempSync(join(tmpdir(), "resonator-verify-"));
   const home = join(tmp, "home");
   mkdirSync(home);
   const env = { HOME: home, USERPROFILE: home };
 
   const path = node("config.ts", ["path"], { env });
-  check("config-path", path.code === 0 && path.out.trim() === join(home, ".claude", "astack", "config.json"), path.out.trim());
+  check("config-path", path.code === 0 && path.out.trim() === join(home, ".claude", "resonator", "config.json"), path.out.trim());
   const model = node("config.ts", ["model", "lead"], { env });
   check("config-model-lead", model.code === 0 && /^\S+ \S+$/.test(model.out.trim()), model.out.trim());
   const badRole = node("config.ts", ["model", "nope"], { env });
@@ -165,7 +165,7 @@ function smoke(): void {
   let ssOk = false;
   try {
     const j = JSON.parse(ss.out) as { hookSpecificOutput?: { hookEventName?: string; additionalContext?: string } };
-    ssOk = j.hookSpecificOutput?.hookEventName === "SessionStart" && (j.hookSpecificOutput.additionalContext ?? "").includes(join("skills", "astack", "SKILL.md"));
+    ssOk = j.hookSpecificOutput?.hookEventName === "SessionStart" && (j.hookSpecificOutput.additionalContext ?? "").includes(join("skills", "resonator", "SKILL.md"));
   } catch {
     // stays false
   }
@@ -176,8 +176,8 @@ function smoke(): void {
   const git = (...a: string[]): Run => run("git", a, { cwd: repo });
   git("init", "-q", "-b", "main");
   git("-c", "user.email=v@v", "-c", "user.name=v", "commit", "-q", "--allow-empty", "-m", "init");
-  const wenv = { ...env, ASTACK_SKIP_INSTALL: "1" };
-  const create = node("worktree.ts", ["create", "--branch", "astack/verify", "--slot", "1", "--base", "main"], { cwd: repo, env: wenv });
+  const wenv = { ...env, RESONATOR_SKIP_INSTALL: "1" };
+  const create = node("worktree.ts", ["create", "--branch", "resonator/verify", "--slot", "1", "--base", "main"], { cwd: repo, env: wenv });
   let slotPath = "";
   try {
     slotPath = (JSON.parse(create.out) as { path?: string }).path ?? "";
@@ -185,14 +185,14 @@ function smoke(): void {
     // stays empty
   }
   check("worktree-create", create.code === 0 && slotPath !== "" && existsSync(slotPath), create.code === 0 ? slotPath : tail(create));
-  const remove = node("worktree.ts", ["remove", "--branch", "astack/verify"], { cwd: repo, env: wenv });
+  const remove = node("worktree.ts", ["remove", "--branch", "resonator/verify"], { cwd: repo, env: wenv });
   check("worktree-remove", remove.code === 0 && slotPath !== "" && !existsSync(slotPath), remove.code === 0 ? "" : tail(remove));
 
-  const noGh = { ...env, ASTACK_GH: join(tmp, "no-such-gh") };
+  const noGh = { ...env, RESONATOR_GH: join(tmp, "no-such-gh") };
   const issues = node("issues.ts", ["list"], { cwd: repo, env: noGh });
-  check("issues-list-no-gh", issues.code === 2 && issues.err.includes("astack: GitHub unavailable"), `exit ${issues.code}: ${tail(issues)}`);
+  check("issues-list-no-gh", issues.code === 2 && issues.err.includes("resonator: GitHub unavailable"), `exit ${issues.code}: ${tail(issues)}`);
   const wp = node("watch-pr/cli.ts", ["1", "--once", "--json"], { cwd: repo, env: noGh });
-  check("watch-pr-no-gh", wp.code === 2 && wp.err.includes("astack: GitHub unavailable"), `exit ${wp.code}: ${tail(wp)}`);
+  check("watch-pr-no-gh", wp.code === 2 && wp.err.includes("resonator: GitHub unavailable"), `exit ${wp.code}: ${tail(wp)}`);
 
   const ev = node("evidence.ts", [], { cwd: repo, env });
   check("evidence-usage", ev.code !== 0 && ev.err.includes("usage: evidence.ts"), `exit ${ev.code}: ${tail(ev)}`);
@@ -218,9 +218,9 @@ function structure(): void {
       .map((e) => e.name.replace(/\.md$/, ""));
   const docs = [...listMd(join(ROOT, "skills")), ...listMd(join(ROOT, "agents"))];
 
-  const router = readFileSync(join(ROOT, "skills", "astack", "SKILL.md"), "utf8");
+  const router = readFileSync(join(ROOT, "skills", "resonator", "SKILL.md"), "utf8");
   const slugs = routerPlaybookSlugs(router);
-  const missing = missingPlaybooks(slugs, new Set(names("skills/astack/playbooks", false)));
+  const missing = missingPlaybooks(slugs, new Set(names("skills/resonator/playbooks", false)));
   check("playbooks", slugs.length > 0 && missing.length === 0, slugs.length === 0 ? "no slugs found" : missing.length ? `missing: ${missing.join(", ")}` : `${slugs.length} slugs`);
 
   const skills = new Set(names("skills", true));

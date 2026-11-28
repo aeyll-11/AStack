@@ -8,7 +8,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 
 - Launch Notes with `notes-cli launch --port $PORT`. It runs `PORT=$PORT npm run dev` with `DATABASE_URL=file:/tmp/notes-verify-$PORT.db` and waits until `GET /api/health` returns 200.
 - Run `notes-cli seed`. It runs `npm run db:migrate` and `npm run db:seed -- --fixture verify`. The fixture creates the user `verify@example.test` and the notes `Quarterly plan` (body `Draft budget`) and `Grocery list`.
-- Sign in once with `notes-cli login`. It fills the `/login` form as `verify@example.test`, saves the browser session to `.astack/verify/state.json`, and writes a cookie jar for `curl` to `.astack/verify/cookies.txt`.
+- Sign in once with `notes-cli login`. It fills the `/login` form as `verify@example.test`, saves the browser session to `.resonator/verify/state.json`, and writes a cookie jar for `curl` to `.resonator/verify/cookies.txt`.
 - Run `notes-cli doctor` and require every line to be `ok`: process, port, ready, seed, auth.
 - Never drive an instance that was not started by this verification run.
 
@@ -18,7 +18,7 @@ This directory is the maintained source for verifying the user-facing behavior o
 - One structural action per call. Run `notes-cli snapshot` before and after it, and read the snapshot instead of guessing.
 - Target by role and accessible name (`button:New note`), then `testid:`, `label:`, `text:`. Never coordinates, never CSS chains.
 - Treat every command as literal. Keep quoted names and flags unchanged.
-- Run API requests with `curl -sS -i -b .astack/verify/cookies.txt http://127.0.0.1:$PORT<path>` and save the full response.
+- Run API requests with `curl -sS -i -b .resonator/verify/cookies.txt http://127.0.0.1:$PORT<path>` and save the full response.
 - Restore seeded data after a mutation with `notes-cli seed`. Do not remove proof artifacts during cleanup.
 - A missing CLI capability is a CLI change. Never write a one-off browser script.
 

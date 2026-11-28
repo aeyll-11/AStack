@@ -28,7 +28,7 @@ Add a seat for another surface the change touches, such as rendering and hydrati
 
 ## Fan out
 
-Spawn all seats in one message with `subagent_type: "astack:xiangli-yao"` and `isolation: "worktree"`. Copy the scope's uncommitted changes into each worktree, or name the commit to check out. Give each adversary the scope, the intent, its attack surface, and this brief:
+Spawn all seats in one message with `subagent_type: "resonator:xiangli-yao"` and `isolation: "worktree"`. Copy the scope's uncommitted changes into each worktree, or name the commit to check out. Give each adversary the scope, the intent, its attack surface, and this brief:
 
 > Break this change on your attack surface. Prove each finding with a run against the real code, such as a failing test, a repro script, a `curl` against the dev server, or command output that shows the wrong behavior. For a design or plan, run a prototype or probe the current tree. Keep repros in your own worktree. Report each finding with a title, the exact command, the output it printed, and the output the intent requires. Leave out anything you did not run. That covers style, naming, structure, and risks that need a future change to matter. No findings is a valid result.
 

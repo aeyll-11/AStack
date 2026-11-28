@@ -6,11 +6,11 @@ disable-model-invocation: true
 
 # Figure it out
 
-When the task matches no playbook in `<plugin root>/skills/astack/playbooks/`, design one. `<plugin root>` is two levels above this skill's folder. The deliverable before any code is the workflow itself: a sequence of phases that scales rigor to the task, runs the scientific method, and leaves a decision trail a human can audit after stepping away.
+When the task matches no playbook in `<plugin root>/skills/resonator/playbooks/`, design one. `<plugin root>` is two levels above this skill's folder. The deliverable before any code is the workflow itself: a sequence of phases that scales rigor to the task, runs the scientific method, and leaves a decision trail a human can audit after stepping away.
 
 ## Start
 
-Open a task list with `TaskCreate`. Its first task is to read the principles section of the **astack** router, `<plugin root>/skills/astack/SKILL.md`. Then add the phases below as tasks.
+Open a task list with `TaskCreate`. Its first task is to read the principles section of the **resonator** router, `<plugin root>/skills/resonator/SKILL.md`. Then add the phases below as tasks.
 
 ## Phase A: Frame
 

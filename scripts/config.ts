@@ -33,7 +33,7 @@ function setPath(obj: Obj, key: string, value: unknown): void {
 }
 
 function fail(msg: string, code: number): never {
-  process.stderr.write(`astack: ${msg}\n`);
+  process.stderr.write(`resonator: ${msg}\n`);
   process.exit(code);
 }
 

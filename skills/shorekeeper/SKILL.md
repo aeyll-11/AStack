@@ -14,7 +14,7 @@ Shorekeeper watches over one PR until its checks are green. A red run gets **Enc
 
 - **PR number.** From the caller, else `gh pr view --json number -q .number`.
 - **Code role.** The caller's playbook names it: `implementer` by default, `bugfix` under the verina playbook.
-- **Branch ownership.** The caller says whether AStack owns the PR's branch. Opening-a-pr always does. In babysit, AStack owns only branches it created.
+- **Branch ownership.** The caller says whether Resonator owns the PR's branch. Opening-a-pr always does. In babysit, Resonator owns only branches it created.
 - **Retry cap.** `node <plugin root>/scripts/config.ts get ciRetries` prints it. The default is 3.
 
 Start with `encore = 0` and `pushed` unset.
@@ -28,7 +28,7 @@ node <plugin root>/scripts/watch-pr/cli.ts <n> --once --json
 It prints one line, such as `{"state":"red","head":"9f3c2e1…","failing":[{"name":"test (node 22)","link":"https://github.com/acme/web/actions/runs/123/job/456"}],"unresolvedThreads":1}`. The exit code says how to read it:
 
 - **0**: act on `state`, below. If `pushed` is set and `head` differs from it, GitHub has not caught up with your push yet, and its checks belong to the old commit. Treat the result as `pending`, whatever `state` says.
-- **2**: `astack: GitHub unavailable: <reason>`. `gh` is missing or not logged in. Return `escalated` with that message.
+- **2**: `resonator: GitHub unavailable: <reason>`. `gh` is missing or not logged in. Return `escalated` with that message.
 - **7**: the status query failed. The detail is on stderr. Poll again after the next wait. After three failures in a row, return `escalated` with the detail. One exception: if the detail says no checks were reported on the branch, and it still says so after three polls, the repo runs no CI on this PR. Return `green`, and say in the reply that the PR has no checks.
 - **Any other exit**: return `escalated` with its stderr.
 
@@ -45,14 +45,14 @@ It prints one line, such as `{"state":"red","head":"9f3c2e1…","failing":[{"nam
 1. **Read the log.** Each `failing` link names its run, as in `/actions/runs/<run-id>/`. Save the log to a file and read only the failing part: `gh run view <run-id> --log-failed > <tmp>/ci-<run-id>.log`. A link outside GitHub Actions comes from an external CI. Open it with the tools you have. If you cannot reach that log, return `escalated`.
 2. **Find the root cause.** Read the **principle-fix-root-causes** skill. Trace the failure to the first place the system went wrong. Reproduce it locally with the same command the job ran, such as `npm test -- src/cart.test.ts` or `npx playwright test checkout.spec.ts`.
 3. **Flake gets one rerun.** If the failure is outside the diff and does not reproduce locally (a network timeout, a runner crash), rerun once with `gh run rerun <run-id> --failed`. Only the diff's own failures get a commit. A second failure of the same job is not a flake.
-4. **Fix.** Spawn `astack:xiangli-yao` with the code role. Run `node <plugin root>/scripts/config.ts model <role>` and pass the `model` and `effort` it prints. It works in the PR's slot, else the current checkout of the PR branch, under the **astack** router's writer rule: no `isolation`, the brief names the slot path and branch, it commits there and never pushes, and you wait for it. The first line of the brief is `Read <plugin root>/skills/astack/worker.md before anything else.` Then give the goal, the failing job, the log excerpt's path, and the root cause. Review the diff yourself. Rerun the failing command locally. Push with `git push -u origin HEAD`, never with force, then set `pushed` to `git rev-parse HEAD`.
+4. **Fix.** Spawn `resonator:xiangli-yao` with the code role. Run `node <plugin root>/scripts/config.ts model <role>` and pass the `model` and `effort` it prints. It works in the PR's slot, else the current checkout of the PR branch, under the **resonator** router's writer rule: no `isolation`, the brief names the slot path and branch, it commits there and never pushes, and you wait for it. The first line of the brief is `Read <plugin root>/skills/resonator/worker.md before anything else.` Then give the goal, the failing job, the log excerpt's path, and the root cause. Review the diff yourself. Rerun the failing command locally. Push with `git push -u origin HEAD`, never with force, then set `pushed` to `git rev-parse HEAD`.
 5. **Count it.** `encore += 1`. A flake rerun counts too. Go back to step 1.
 
 ## 4. Conflict pass
 
 You get one attempt.
 
-- **AStack owns the branch.** In the PR's slot, run `git fetch origin <base>`, then `git merge origin/<base>`. Resolve the conflicts by keeping both sides' intent. Run the tests, commit the merge, and push without force. Set `pushed` to `git rev-parse HEAD`. Delegate code-heavy resolutions to `astack:xiangli-yao` as in Encore step 4. Then poll again.
+- **Resonator owns the branch.** In the PR's slot, run `git fetch origin <base>`, then `git merge origin/<base>`. Resolve the conflicts by keeping both sides' intent. Run the tests, commit the merge, and push without force. Set `pushed` to `git rev-parse HEAD`. Delegate code-heavy resolutions to `resonator:xiangli-yao` as in Encore step 4. Then poll again.
 - **Anyone else's branch.** Make no attempt.
 
 A PR that is still conflicting after the attempt, or one you may not touch, returns `conflict`. Name the branch that needs the rebase.

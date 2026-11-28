@@ -10,7 +10,7 @@ const REPOS = join(import.meta.dirname, "fixtures", "repos");
 const CLI = join(import.meta.dirname, "..", "scripts", "detect.ts");
 
 function tmp(files: Record<string, string>): string {
-  const root = mkdtempSync(join(tmpdir(), "astack-detect-"));
+  const root = mkdtempSync(join(tmpdir(), "resonator-detect-"));
   for (const [p, text] of Object.entries(files)) {
     mkdirSync(join(root, p, ".."), { recursive: true });
     writeFileSync(join(root, p), text);

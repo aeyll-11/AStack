@@ -35,7 +35,7 @@ git diff --name-only <range> | grep -E '\.(vue|tsx|jsx|svelte|css|scss|html)$|(^
 
 ## 3. Fan out
 
-For each reviewer, run `node <plugin root>/scripts/config.ts model <role>`. It prints `<model> <effort>`. Spawn every reviewer in one message with the `Agent` tool, `subagent_type: "astack:<agent>"`, and the printed `model` and `effort`. The brief is the range, the packs, the absolute `<plugin root>`, the absolute path of the PR's checkout (the PR slot under the **astack** router), and the PR title and `## Why` as intent. Seats run git there with `git -C <path>` and read files under that path.
+For each reviewer, run `node <plugin root>/scripts/config.ts model <role>`. It prints `<model> <effort>`. Spawn every reviewer in one message with the `Agent` tool, `subagent_type: "resonator:<agent>"`, and the printed `model` and `effort`. The brief is the range, the packs, the absolute `<plugin root>`, the absolute path of the PR's checkout (the PR slot under the **resonator** router), and the PR title and `## Why` as intent. Seats run git there with `git -C <path>` and read files under that path.
 
 A reviewer that fails or replies off-format drops out. Name it in the comment and continue with the rest.
 
@@ -52,7 +52,7 @@ Treat each finding as a hypothesis. Accept it only with proof:
 
 Reject a finding when the run shows the right result, when the trace breaks (a guard upstream, a type that forbids the input), when the base branch already has the problem, or when the scenario needs a change that does not exist yet. Record the reason in one line, such as `rejected: auth middleware on server/api/orders/** checks owner first`.
 
-Fix the accepted findings in the PR's checkout: the PR slot under the **astack** router, else the current checkout of the PR branch. Delegate each fix to `astack:xiangli-yao` with the caller's code role, or `implementer` when run alone, under the router's writer rule: no `isolation`, the brief names the checkout path and the branch, the writer commits there and never pushes, and you wait for it. The brief carries the finding, its proof, and the range. Each fix lands as its own commit on the branch. Rerun the proof and confirm it now passes. Push with `git push -u origin HEAD`, never with force, before you post. Record `fixed <short sha>`, the fix commit that push published. A fix whose proof still fails goes back for another round.
+Fix the accepted findings in the PR's checkout: the PR slot under the **resonator** router, else the current checkout of the PR branch. Delegate each fix to `resonator:xiangli-yao` with the caller's code role, or `implementer` when run alone, under the router's writer rule: no `isolation`, the brief names the checkout path and the branch, the writer commits there and never pushes, and you wait for it. The brief carries the finding, its proof, and the range. Each fix lands as its own commit on the branch. Rerun the proof and confirm it now passes. Push with `git push -u origin HEAD`, never with force, before you post. Record `fixed <short sha>`, the fix commit that push published. A fix whose proof still fails goes back for another round.
 
 ## 6. Post one comment
 

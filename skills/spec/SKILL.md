@@ -37,14 +37,14 @@ Where the input is silent, pick the reading that best fits the code and the prod
 
 ## 4. Save and return
 
-Save the block to `<repo>/.astack/spec/<branch>.md`, where `<repo>` is `git rev-parse --show-toplevel` and `<branch>` is the current branch with each `/` replaced by `-`. Under the **astack** router, run this from the PR slot, so `<branch>` is the PR branch. Keep it out of git through the shared exclude file, never `.gitignore`:
+Save the block to `<repo>/.resonator/spec/<branch>.md`, where `<repo>` is `git rev-parse --show-toplevel` and `<branch>` is the current branch with each `/` replaced by `-`. Under the **resonator** router, run this from the PR slot, so `<branch>` is the PR branch. Keep it out of git through the shared exclude file, never `.gitignore`:
 
 ```bash
 repo=$(git rev-parse --show-toplevel)
 branch=$(git rev-parse --abbrev-ref HEAD | tr / -)
 exclude="$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
-mkdir -p "$repo/.astack/spec" "$(dirname "$exclude")"
-git -C "$repo" check-ignore -q .astack/spec/x || echo ".astack/spec/" >> "$exclude"
+mkdir -p "$repo/.resonator/spec" "$(dirname "$exclude")"
+git -C "$repo" check-ignore -q .resonator/spec/x || echo ".resonator/spec/" >> "$exclude"
 ```
 
 Then write the file with this shape and return the same block to the caller, so it can go in the PR body:

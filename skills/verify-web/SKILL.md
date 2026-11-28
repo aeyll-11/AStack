@@ -12,22 +12,22 @@ Each criterion ends as **PASS**, **FAIL**, or **INCONCLUSIVE**. Inconclusive is 
 
 ## 1. Gather the criteria and the evidence folder
 
-Run from the checkout that holds the change. Under the **astack** router that is the PR slot.
+Run from the checkout that holds the change. Under the **resonator** router that is the PR slot.
 
 ```bash
 repo=$(git rev-parse --show-toplevel)
 branch=$(git rev-parse --abbrev-ref HEAD | tr / -)
-ev="$repo/.astack/evidence/$branch"
+ev="$repo/.resonator/evidence/$branch"
 exclude="$(git rev-parse --path-format=absolute --git-common-dir)/info/exclude"
 mkdir -p "$ev" "$(dirname "$exclude")"
-git -C "$repo" check-ignore -q .astack/evidence/x || echo ".astack/evidence/" >> "$exclude"
-git -C "$repo" check-ignore -q .astack/verify/x || echo ".astack/verify/" >> "$exclude"
+git -C "$repo" check-ignore -q .resonator/evidence/x || echo ".resonator/evidence/" >> "$exclude"
+git -C "$repo" check-ignore -q .resonator/verify/x || echo ".resonator/verify/" >> "$exclude"
 echo "$ev"
 ```
 
 Shell variables do not survive between Bash calls. Use the printed paths and the port literally in later steps.
 
-- Read the criteria from `$repo/.astack/spec/<branch>.md`. With no file, use the criteria in your brief. With neither, run the **spec** skill first.
+- Read the criteria from `$repo/.resonator/spec/<branch>.md`. With no file, use the criteria in your brief. With neither, run the **spec** skill first.
 - For a bug repro, the criterion is the repro itself: the request, page, or test that shows the bug.
 - Tag every criterion by surface before you drive it: `[http]`, `[browser]`, or `[test]`. Criteria from a brief or a repro often carry no tag. Tag them by what a user touches: an API route is `[http]`, a page is `[browser]`. Use `[test]` only for logic no running app reaches cheaply.
 - If the change touches user-facing or runtime code (pages, components, routes, handlers, middleware, server config) and no criterion is `[http]` or `[browser]`, add one that exercises the changed path. A `[test]` never stands in for the running app.
@@ -46,13 +46,13 @@ For each criterion, find the matching feature file in the map. Its `Ownership:` 
 ## 3. Launch through the CLI
 
 - **Port.** If your brief or this session has the JSON from `worktree.ts create`, use its `port`. Otherwise use `node <plugin root>/scripts/config.ts get devServer` → `basePort`, or the CLI's own default. `cli launch` refuses a port someone else holds; then pick the next free one and never drive the other instance.
-- **Start.** Run `cli launch --port <port>`, `cli seed`, `cli login`, then `cli doctor`. Copy `.astack/verify/app.log` into `$ev/server.log` when anything fails.
+- **Start.** Run `cli launch --port <port>`, `cli seed`, `cli login`, then `cli doctor`. Copy `.resonator/verify/app.log` into `$ev/server.log` when anything fails.
 - **No Playwright.** `cli login` exits 3. Skip it. A doctor failure on `auth` alone then blocks only the criteria that need a session.
 - **Not ready** (`launch` or `doctor` exits non-zero): run `cli cleanup`, report `BLOCKED: <the CLI's reason>` with the last 40 lines of the log, and verify nothing.
 
 ## 4. Drive each criterion
 
-**`[http]`.** Run the request with `curl -sS -i -b .astack/verify/cookies.txt` against `127.0.0.1:<port>`. Save the exact command and the full response (status line, headers, body) to `$ev/<n>-http.txt`. Compare status and fields with the criterion. A mutation also needs a second read that shows the stored result.
+**`[http]`.** Run the request with `curl -sS -i -b .resonator/verify/cookies.txt` against `127.0.0.1:<port>`. Save the exact command and the full response (status line, headers, body) to `$ev/<n>-http.txt`. Compare status and fields with the criterion. A mutation also needs a second read that shows the stored result.
 
 **`[browser]`.** Through the CLI only:
 
@@ -77,7 +77,7 @@ One row per criterion:
 
 | # | Criterion | Surface | Result | Evidence |
 |---|---|---|---|---|
-| 1 | POST /api/notes/42/archive returns 204 | http | PASS | `.astack/evidence/feat-archive/1-http.txt` |
+| 1 | POST /api/notes/42/archive returns 204 | http | PASS | `.resonator/evidence/feat-archive/1-http.txt` |
 | 2 | "Archive" removes the note from /notes | browser | INCONCLUSIVE | No Playwright in the project |
 
 The overall result is the first that applies:
