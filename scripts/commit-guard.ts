@@ -88,9 +88,34 @@ function commitArgs(tokens: string[]): { dir: string | null; args: string[] } | 
   return { dir, args: tokens.slice(i + 1) };
 }
 
+function ghBodyArgs(tokens: string[]): string[] | null {
+  let i = 0;
+  while (i < tokens.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(tokens[i])) i++;
+  if (tokens[i] !== "gh") return null;
+  const [noun, verb] = [tokens[i + 1], tokens[i + 2]];
+  const ok = (noun === "pr" && (verb === "create" || verb === "edit" || verb === "comment")) || (noun === "issue" && (verb === "create" || verb === "edit" || verb === "comment"));
+  return ok ? tokens.slice(i + 3) : null;
+}
+
+function parseGhBody(args: string[], result: CommitCommand): void {
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
+    let m: RegExpExecArray | null;
+    if ((m = /^--(body|body-file)=(.*)$/s.exec(a))) put(result, m[1] === "body" ? "message" : "file", m[2]);
+    else if (a === "--body" || a === "-b") put(result, "message", i + 1 < args.length ? args[++i] : "");
+    else if (a === "--body-file" || a === "-F") put(result, "file", i + 1 < args.length ? args[++i] : "");
+  }
+}
+
 export function parseCommitCommand(command: string): CommitCommand | null {
   let result: CommitCommand | null = null;
   for (const tokens of splitSegments(command)) {
+    const gh = ghBodyArgs(tokens);
+    if (gh) {
+      result ??= { dir: null, messages: [], files: [], authors: [], trailers: [] };
+      parseGhBody(gh, result);
+      continue;
+    }
     const found = commitArgs(tokens);
     if (!found) continue;
     result ??= { dir: found.dir, messages: [], files: [], authors: [], trailers: [] };
@@ -128,7 +153,7 @@ function scanText(text: string, source: string, out: string[]): void {
 
 export function findViolations(cmd: CommitCommand, ctx: Context, rawCommand?: string): string[] {
   const out: string[] = [];
-  for (const m of cmd.messages) scanText(m, "the -m message", out);
+  for (const m of cmd.messages) scanText(m, "the message/body", out);
   for (const t of cmd.trailers) scanText(t, "the --trailer", out);
   for (const t of cmd.trailers) if (!CO_AUTHOR.test(t) && AI_NAME.test(t) && /co-authored-by/i.test(t)) out.push(`the --trailer names an AI: "${t}"`);
   for (const f of cmd.files) {
@@ -145,7 +170,7 @@ export function findViolations(cmd: CommitCommand, ctx: Context, rawCommand?: st
 }
 
 export function denial(violations: string[]): string {
-  const reason = `Commit blocked by the Resonator commit guard: ${violations.join("; ")}. Remove the AI trailer or attribution line (and drop --author unless it equals your git identity), then retry. Commits carry the current git user as sole author, per the resonator commit skill.`;
+  const reason = `Blocked by the Resonator commit guard: ${violations.join("; ")}. Remove the AI trailer or attribution line from the commit message, PR body, or comment (and drop --author unless it equals your git identity), then retry. Commits, PR bodies, and comments carry no AI attribution, per the resonator commit skill.`;
   return JSON.stringify({
     hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: reason },
   });
