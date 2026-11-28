@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Verification driver for this app. Generated from Resonator's app-cli template.
 // Every command and its use is documented in ../SKILL.md. When the app changes, edit the config block, not the code.
-// "auth": null for an app with no sign-in (login prints "skip no auth"). "rootMarker": null for an app with no pages (no marker check).
+// "auth": null for an app with no sign-in (login prints "skip no auth"). "auth": { "http": { method, route, json } } signs in with one
+// request, no browser. "rootMarker": null for an app with no pages (no marker check). Secrets are "{env:NAME}", read from process.env.
 // {port} and {baseUrl} are substituted in baseUrl, launch, teardown, and seed.
 /* resonator-config
 {
@@ -33,7 +34,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 const ROLES = new Set(("alert alertdialog button checkbox cell columnheader combobox dialog grid gridcell heading img link list listitem " +
   "listbox main menu menubar menuitem menuitemcheckbox menuitemradio navigation option progressbar radio radiogroup region row " +
   "rowheader search searchbox slider spinbutton status switch tab table tablist tabpanel textbox toolbar tooltip tree treeitem").split(" "));
-const BOOL_FLAGS = new Set(["headed", "idle", "all"]);
+const BOOL_FLAGS = new Set(["headed", "idle", "all", "save-cookies"]);
 const LIST_FLAGS = new Set(["header"]);
 const STEP_ACTIONS = new Set(["fill", "click", "press"]);
 
@@ -75,9 +76,19 @@ export function parsePort(v) {
   return n;
 }
 
-const HTTP_USAGE = "usage: http <METHOD> <route> [--json <body>|--json-file <path>] [--header k:v]... [--expect <status>] [--out <path>]";
+const HTTP_USAGE = "usage: http <METHOD> <route> [--json <body>|--json-file <path>] [--header k:v]... [--expect <status>] [--out <path>] [--save-cookies]";
+const TOKEN = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+const CTL = /[\0-\x08\x0a-\x1f\x7f]/;
 
-// --json is sent as given, unchecked, so a malformed body can be proven too.
+// {env:NAME} in strings, arrays and object values, from env only. Used for auth.http.json and --header values.
+export function expandEnv(v, env) {
+  if (typeof v === "string") return v.replace(/\{env:([A-Za-z_][A-Za-z0-9_]*)\}/g, (_, n) => { if (env[n] === undefined) throw new Error(`env var ${n} is not set`); return env[n]; });
+  if (Array.isArray(v)) return v.map((x) => expandEnv(x, env));
+  if (v && typeof v === "object") return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, expandEnv(x, env)]));
+  return v;
+}
+
+// --json is sent as given, unchecked, so a malformed body can be proven too. Header values keep {env:} unexpanded until send.
 export function parseHttpArgs(args, flags, base, readFile = (p) => readFileSync(p, "utf8")) {
   if (args.length < 2) throw new Error(HTTP_USAGE);
   const method = args[0].toUpperCase();
@@ -90,9 +101,14 @@ export function parseHttpArgs(args, flags, base, readFile = (p) => readFileSync(
   for (const h of flags.header ?? []) {
     const i = h.indexOf(":");
     if (i < 1) throw new Error(`--header "${h}" must be k:v`);
-    headers[h.slice(0, i).trim().toLowerCase()] = h.slice(i + 1).trim();
+    const [name, value] = [h.slice(0, i).trim(), h.slice(i + 1).trim()];
+    if (!TOKEN.test(name)) throw new Error(`header name "${name}" may hold only letters, digits and !#$%&'*+.^_\`|~-`);
+    if (CTL.test(value)) throw new Error(`header ${name} has a control character in its value`);
+    headers[name.toLowerCase()] = value;
   }
-  return { method, url: url.href, headers, ...(body !== undefined && { body }) };
+  const t = String(flags.timeout ?? 10000);
+  if (!/^\d+$/.test(t) || Number(t) < 1) throw new Error(`--timeout must be a positive whole number of milliseconds, got "${t}"`);
+  return { method, url: url.href, headers, ...(body !== undefined && { body }), timeoutMs: Number(t) };
 }
 
 // Netscape cookie jar (what login writes, and what curl -c writes) to a Cookie header for this host.
@@ -106,6 +122,42 @@ export function jarCookies(text, url, nowSec = Date.now() / 1000) {
     .map((c) => `${c[5]}=${c[6] ?? ""}`).join("; ");
 }
 
+function parseSetCookie(header, url, nowSec) {
+  const [pair, ...attrs] = header.split(";");
+  const eq = pair.indexOf("=");
+  if (eq < 1) return null;
+  const u = new URL(url);
+  const c = { name: pair.slice(0, eq).trim(), value: pair.slice(eq + 1).trim(), domain: u.hostname, sub: "FALSE", path: u.pathname.slice(0, u.pathname.lastIndexOf("/")) || "/", secure: "FALSE", httpOnly: false };
+  let maxAge, exp;
+  for (const a of attrs) {
+    const i = a.indexOf("="), key = (i < 0 ? a : a.slice(0, i)).trim().toLowerCase(), val = i < 0 ? "" : a.slice(i + 1).trim();
+    if (key === "domain" && val) [c.domain, c.sub] = [`.${val.replace(/^\./, "")}`, "TRUE"];
+    else if (key === "path" && val.startsWith("/")) c.path = val;
+    else if (key === "secure") c.secure = "TRUE";
+    else if (key === "httponly") c.httpOnly = true;
+    else if (key === "max-age" && /^-?\d+$/.test(val)) maxAge = Number(val);
+    else if (key === "expires" && !Number.isNaN(Date.parse(val))) exp = Math.floor(Date.parse(val) / 1000);
+  }
+  const at = maxAge !== undefined ? Math.floor(nowSec) + maxAge : exp;
+  c.expires = at === undefined ? 0 : at <= nowSec ? -1 : at;
+  return c;
+}
+
+// Response Set-Cookie headers into the Netscape jar that http reads and curl -b accepts. -1 expiry deletes.
+export function mergeJar(text, setCookies, url, nowSec = Date.now() / 1000) {
+  const rows = new Map();
+  for (const l of text.split("\n")) {
+    const f = l.replace(/^#HttpOnly_/, "").split("\t");
+    if (l && (!l.startsWith("#") || l.startsWith("#HttpOnly_")) && f.length >= 7) rows.set(`${f[0]}\t${f[2]}\t${f[5]}`, l);
+  }
+  for (const c of setCookies.map((h) => parseSetCookie(h, url, nowSec)).filter(Boolean)) {
+    const key = `${c.domain}\t${c.path}\t${c.name}`;
+    if (c.expires < 0) rows.delete(key);
+    else rows.set(key, `${c.httpOnly ? "#HttpOnly_" : ""}${[c.domain, c.sub, c.path, c.secure, c.expires, c.name, c.value].join("\t")}`);
+  }
+  return ["# Netscape HTTP Cookie File", ...rows.values(), ""].join("\n");
+}
+
 export function expectMatches(spec, status) {
   const parts = String(spec).split(",").map((p) => p.trim());
   if (!parts.every((p) => /^\d{3}$|^[1-5]xx$/i.test(p))) throw new Error(`--expect "${spec}" must be a status (201), a class (2xx), or a list (200,204)`);
@@ -113,7 +165,11 @@ export function expectMatches(spec, status) {
 }
 
 const asJson = (t) => { if (t === undefined) return null; try { return JSON.parse(t); } catch { return t; } };
-export const httpEvidence = (req, res) => ({ request: { ...req, body: asJson(req.body) }, status: res.status, statusText: res.statusText, headers: res.headers, body: asJson(res.body) });
+export const httpEvidence = (req, res) => ({
+  request: { method: req.method, url: req.url, headers: req.headers, body: asJson(req.body) },
+  status: res.status, statusText: res.statusText,
+  headers: res.headers["set-cookie"] === undefined ? res.headers : { ...res.headers, "set-cookie": "<redacted>" }, body: asJson(res.body),
+});
 
 export function httpLine(status, body, max = 300) {
   const flat = body.replace(/\s+/g, " ").trim();
@@ -146,6 +202,7 @@ export function parseConfigBlock(source) {
   if (!Number.isInteger(raw.port)) throw new Error("config: port must be an integer");
   const c = { readyTimeoutMs: 60000, settleMs: 3000, rootMarker: null, teardown: null, seed: null, auth: null, flag: { kind: "cookie", prefix: "flag_" }, ...raw };
   if (c.rootMarker) try { parseTarget(c.rootMarker); } catch (e) { throw new Error(`config: rootMarker: ${e.message}`); }
+  if (c.auth?.http && !(typeof c.auth.http.method === "string" && typeof c.auth.http.route === "string")) throw new Error("config: auth.http needs a method and a route");
   (c.auth?.steps ?? []).forEach(([action, target], i) => {
     try {
       if (!STEP_ACTIONS.has(action)) throw new Error(`unknown action "${action}"`);
@@ -207,9 +264,7 @@ const pgid = (pid) => Number(spawnSync("ps", ["-o", "pgid=", "-p", String(pid)],
 async function status(url, opts = {}) {
   try { return (await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(5000), ...opts })).status; } catch { return 0; }
 }
-function cookieHeader() {
-  return (readJson(F.state)?.cookies ?? []).map((c) => `${c.name}=${c.value}`).join("; ");
-}
+const jarHeader = (url) => (existsSync(F.jar) ? jarCookies(readFileSync(F.jar, "utf8"), url) : "");
 function saveJar() {
   const rows = (readJson(F.state)?.cookies ?? []).map((c) => [c.domain, c.domain.startsWith(".") ? "TRUE" : "FALSE", c.path, c.secure ? "TRUE" : "FALSE", Math.max(0, Math.floor(c.expires)), c.name, c.value].join("\t"));
   writeFileSync(F.jar, `# Netscape HTTP Cookie File\n${rows.join("\n")}\n`);
@@ -261,8 +316,8 @@ async function doctor(x) {
   check(s > 0 && s < 500, "ready", `${x.cfg.readyPath} -> ${s || "no answer"}`);
   if (x.cfg.seed?.check) { const c = expand(x.cfg.seed.check, x); check(sh(c, { PORT: String(x.port), BASE_URL: x.base }) === 0, "seed", c); }
   if (x.cfg.auth?.check) {
-    const a = existsSync(F.state) ? await status(x.base + x.cfg.auth.check, { headers: { cookie: cookieHeader() } }) : 0;
-    check(a >= 200 && a < 300, "auth", existsSync(F.state) ? `${x.cfg.auth.check} -> ${a}` : "no session, run login");
+    const a = existsSync(F.jar) ? await status(x.base + x.cfg.auth.check, { headers: { cookie: jarHeader(x.base + x.cfg.auth.check) } }) : 0;
+    check(a >= 200 && a < 300, "auth", existsSync(F.jar) ? `${x.cfg.auth.check} -> ${a}` : "no session, run login");
   }
   if (fails.length) throw new Exit(1, `doctor failed: ${fails.join(", ")}`);
 }
@@ -408,14 +463,24 @@ async function ctlCall(path) {
   }).on("error", bad).end());
 }
 
-// No browser: fetch against the launched app, with the login cookie jar when there is one.
+// No browser: one fetch against the launched app, with the cookie jar when there is one.
+async function send(req, saveCookies) {
+  let headers;
+  try {
+    headers = expandEnv(req.headers, process.env);
+    for (const [k, v] of Object.entries(headers)) if (CTL.test(v)) throw new Error(`header ${k}: its env value has a control character`);
+  } catch (e) { throw new Exit(2, e.message); }
+  const cookie = jarHeader(req.url);
+  const res = await fetch(req.url, { method: req.method, headers: { ...(cookie && { cookie }), ...headers }, body: req.body, redirect: "manual", signal: AbortSignal.timeout(req.timeoutMs) })
+    .catch((e) => { throw new Exit(1, `${req.method} ${req.url}: no answer (${e.cause?.code ?? e.message}). Run doctor`); });
+  if (saveCookies) writeFileSync(F.jar, mergeJar(existsSync(F.jar) ? readFileSync(F.jar, "utf8") : "", res.headers.getSetCookie(), req.url));
+  return { cookie, got: { status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers), body: await res.text() } };
+}
+
 async function http(x, args, flags, out) {
   let req;
   try { req = parseHttpArgs(args, flags, x.base); if (flags.expect !== undefined) expectMatches(flags.expect, 0); } catch (e) { throw new Exit(2, e.message); }
-  const cookie = existsSync(F.jar) ? jarCookies(readFileSync(F.jar, "utf8"), req.url) : "";
-  const res = await fetch(req.url, { method: req.method, headers: { ...(cookie && { cookie }), ...req.headers }, body: req.body, redirect: "manual", signal: AbortSignal.timeout(Number(flags.timeout ?? 10000)) })
-    .catch((e) => { throw new Exit(1, `${req.method} ${req.url}: no answer (${e.cause?.code ?? e.message}). Run doctor`); });
-  const got = { status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers), body: await res.text() };
+  const { cookie, got } = await send(req, flags["save-cookies"]);
   if (flags.out) {
     const o = out(flags.out);
     const sent = cookie && !("cookie" in req.headers) ? { ...req, headers: { ...req.headers, cookie: "<from .resonator/verify/cookies.txt>" } } : req;
@@ -424,6 +489,13 @@ async function http(x, args, flags, out) {
   }
   say(httpLine(got.status, got.body));
   if (flags.expect !== undefined && !expectMatches(flags.expect, got.status)) throw new Exit(1, `expected ${flags.expect}, got ${got.status}`);
+}
+
+async function loginHttp(x, form) {
+  let req;
+  try { req = parseHttpArgs([form.method, form.route], form.json === undefined ? {} : { json: JSON.stringify(expandEnv(form.json, process.env)) }, x.base); } catch (e) { throw new Exit(2, e.message); }
+  const { got } = await send(req, true);
+  if (got.status >= 400) throw new Exit(1, `login failed: ${req.method} ${form.route} -> ${got.status}`);
 }
 
 const need = (v, usage) => { if (v === undefined || v === "") throw new Exit(2, `usage: ${usage}`); return v; };
@@ -484,9 +556,10 @@ async function main(argv) {
     case "login": {
       const auth = x.cfg.auth;
       if (!auth) return say("skip no auth");
-      await withPage(x, flags, async (p) => { await open(p, x, auth.route); for (const step of auth.steps) await act(p, x, step); });
-      if (auth.check) { const s = await status(x.base + auth.check, { headers: { cookie: cookieHeader() } }); if (s < 200 || s >= 300) throw new Exit(1, `login did not stick: ${auth.check} -> ${s}`); }
-      return say(`ok login state=${F.state}`);
+      if (auth.http) await loginHttp(x, auth.http);
+      else await withPage(x, flags, async (p) => { await open(p, x, auth.route); for (const step of auth.steps) await act(p, x, step); });
+      if (auth.check) { const s = await status(x.base + auth.check, { headers: { cookie: jarHeader(x.base + auth.check) } }); if (s < 200 || s >= 300) throw new Exit(1, `login did not stick: ${auth.check} -> ${s}`); }
+      return say(auth.http ? `ok login jar=${F.jar}` : `ok login state=${F.state}`);
     }
     case "seed": {
       if (!x.cfg.seed) throw new Exit(2, "no seed hook in config");

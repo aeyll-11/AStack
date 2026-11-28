@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -22,6 +22,7 @@ interface HttpRequest {
   url: string;
   headers: Record<string, string>;
   body?: string;
+  timeoutMs?: number;
 }
 interface HttpResponse {
   status: number;
@@ -40,7 +41,7 @@ interface Config {
   rootMarker: string | null;
   teardown: string | null;
   seed: { command: string; check?: string } | null;
-  auth: { route: string; steps: string[][]; check?: string } | null;
+  auth: { route?: string; steps?: string[][]; http?: { method: string; route: string; json?: unknown }; check?: string } | null;
   flag: { kind: "cookie" | "localStorage"; prefix: string };
 }
 interface CliModule {
@@ -56,6 +57,8 @@ interface CliModule {
   expectMatches(spec: string, status: number): boolean;
   httpEvidence(req: HttpRequest, res: HttpResponse): { request: HttpRequest & { body: unknown }; status: number; statusText: string; headers: Record<string, string>; body: unknown };
   httpLine(status: number, body: string, max?: number): string;
+  expandEnv<T>(v: T, env: Record<string, string | undefined>): T;
+  mergeJar(text: string, setCookies: string[], url: string, nowSec?: number): string;
 }
 
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
@@ -200,7 +203,7 @@ test("expand substitutes {port} and {baseUrl}", () => {
 const base = "http://127.0.0.1:3555";
 
 test("parseHttpArgs builds a GET with an upper-cased method", () => {
-  assert.deepEqual(cli.parseHttpArgs(["get", "/health?x=1"], {}, base), { method: "GET", url: `${base}/health?x=1`, headers: {} });
+  assert.deepEqual(cli.parseHttpArgs(["get", "/health?x=1"], {}, base), { method: "GET", url: `${base}/health?x=1`, headers: {}, timeoutMs: 10000 });
 });
 
 test("parseHttpArgs sends --json as the body with a JSON content type", () => {
@@ -227,6 +230,60 @@ test("parseHttpArgs adds --header values, which override the defaults", () => {
   const r = cli.parseHttpArgs(["POST", "/x"], { json: "{}", header: ["X-Trace: abc", "content-type:text/plain"] }, base);
   assert.deepEqual(r.headers, { "content-type": "text/plain", "x-trace": "abc" });
   assert.throws(() => cli.parseHttpArgs(["GET", "/x"], { header: ["nocolon"] }, base), /k:v/);
+});
+
+test("parseHttpArgs refuses a bad header name, a control character in a value, and a bad --timeout", () => {
+  assert.throws(() => cli.parseHttpArgs(["GET", "/x"], { header: ["bad name:1"] }, base), /header name "bad name"/);
+  assert.throws(() => cli.parseHttpArgs(["GET", "/x"], { header: ["x-a:1\r\nx-b:2"] }, base), /control character/);
+  for (const t of ["0", "-5", "abc", "1.5"]) assert.throws(() => cli.parseHttpArgs(["GET", "/x"], { timeout: t }, base), /--timeout/, t);
+  assert.equal(cli.parseHttpArgs(["GET", "/x"], { timeout: "2500" }, base).timeoutMs, 2500);
+});
+
+test("parseHttpArgs keeps {env:} placeholders unexpanded, so evidence never holds the secret", () => {
+  assert.equal(cli.parseHttpArgs(["GET", "/x"], { header: ["Authorization: Bearer {env:VERIFY_TOKEN}"] }, base).headers.authorization, "Bearer {env:VERIFY_TOKEN}");
+});
+
+test("expandEnv fills {env:NAME} in strings, arrays and objects from the given env only", () => {
+  const env = { VERIFY_USER: "v@example.test", VERIFY_PASS: "p\"w" };
+  assert.equal(cli.expandEnv("Bearer {env:VERIFY_USER}", env), "Bearer v@example.test");
+  assert.deepEqual(cli.expandEnv({ email: "{env:VERIFY_USER}", password: "{env:VERIFY_PASS}", n: 1, tags: ["{env:VERIFY_USER}"] }, env), { email: "v@example.test", password: 'p"w', n: 1, tags: ["v@example.test"] });
+  assert.equal(cli.expandEnv("{port} {baseUrl} $HOME", env), "{port} {baseUrl} $HOME");
+});
+
+test("expandEnv names the missing variable", () => {
+  assert.throws(() => cli.expandEnv({ a: "{env:VERIFY_TOKEN}" }, {}), /VERIFY_TOKEN/);
+});
+
+test("mergeJar writes Set-Cookie into Netscape rows that jarCookies reads back", () => {
+  const jar = cli.mergeJar("", ["sid=abc; Path=/; HttpOnly", "pref=dark; Max-Age=3600; Path=/; Secure"], `${base}/api/login`, 1000);
+  assert.equal(jar, ["# Netscape HTTP Cookie File", "#HttpOnly_127.0.0.1\tFALSE\t/\tFALSE\t0\tsid\tabc", "127.0.0.1\tFALSE\t/\tTRUE\t4600\tpref\tdark", ""].join("\n"));
+  assert.equal(cli.jarCookies(jar, `${base}/todos`, 1000), "sid=abc; pref=dark");
+});
+
+test("mergeJar replaces a cookie, deletes an expired one, and keeps the rest", () => {
+  const first = cli.mergeJar("", ["sid=old; Path=/", "keep=1; Path=/"], `${base}/login`, 1000);
+  const next = cli.mergeJar(first, ["sid=new; Path=/", "keep=; Max-Age=0; Path=/"], `${base}/login`, 1000);
+  assert.equal(cli.jarCookies(next, base, 1000), "sid=new");
+  const gone = cli.mergeJar(first, ["sid=x; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/"], `${base}/login`, 1000);
+  assert.equal(cli.jarCookies(gone, base, 1000), "keep=1");
+});
+
+test("mergeJar uses the Domain attribute and the default path", () => {
+  const jar = cli.mergeJar("", ["a=1; Domain=.example.test", "b=2"], "https://app.example.test/api/auth/login", 0);
+  assert.match(jar, /^\.example\.test\tTRUE\t\/api\/auth\tFALSE\t0\ta\t1$/m);
+  assert.match(jar, /^app\.example\.test\tFALSE\t\/api\/auth\tFALSE\t0\tb\t2$/m);
+});
+
+test("httpEvidence redacts Set-Cookie values", () => {
+  const e = cli.httpEvidence({ method: "POST", url: base, headers: {}, timeoutMs: 10000 }, { status: 204, statusText: "No Content", headers: { "set-cookie": "sid=abc" }, body: "" });
+  assert.equal(e.headers["set-cookie"], "<redacted>");
+  assert.equal("timeoutMs" in e.request, false);
+});
+
+test("parseConfigBlock accepts an HTTP auth form and requires its method and route", () => {
+  const auth = { http: { method: "POST", route: "/api/login", json: { email: "{env:VERIFY_USER}" } }, check: "/api/me" };
+  assert.equal(cli.parseConfigBlock(block(JSON.stringify({ ...minimal, auth }))).auth?.http?.route, "/api/login");
+  assert.throws(() => cli.parseConfigBlock(block(JSON.stringify({ ...minimal, auth: { http: { method: "POST" } } }))), /auth.http/);
 });
 
 test("parseHttpArgs refuses another origin, a bad method, and missing args", () => {
@@ -336,6 +393,10 @@ test("http needs no Playwright and exits 1 on an expect mismatch", async () => {
 // The test server runs in this process, so the CLI must run without blocking the event loop.
 async function runAsync(config: object, argv: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
   const { file, env } = writeFilled(config);
+  return runFile(file, argv, env);
+}
+
+async function runFile(file: string, argv: string[], env: NodeJS.ProcessEnv): Promise<{ status: number | null; stdout: string; stderr: string }> {
   const child = spawn(process.execPath, [file, ...argv], { env });
   let stdout = "", stderr = "";
   child.stdout.on("data", (d: Buffer) => (stdout += d));
@@ -343,3 +404,54 @@ async function runAsync(config: object, argv: string[]): Promise<{ status: numbe
   const status = await new Promise<number | null>((r) => child.on("close", r));
   return { status, stdout, stderr };
 }
+
+test("http --save-cookies and an HTTP auth login fill the jar, need no Playwright, and the jar rides on later calls", async () => {
+  const server = createServer((req, res) => {
+    let body = "";
+    req.on("data", (d: Buffer) => (body += d));
+    req.on("end", () => {
+      if (req.url === "/api/login") {
+        const ok = req.headers.authorization === undefined && body === JSON.stringify({ email: "v@example.test", password: "s3cret" });
+        if (ok) res.setHeader("set-cookie", ["sid=abc; Path=/; HttpOnly"]);
+        res.statusCode = ok ? 204 : 401;
+        return res.end();
+      }
+      if (req.url === "/api/me") { res.statusCode = req.headers.cookie === "sid=abc" ? 200 : 401; return res.end(String(req.headers.cookie ?? "")); }
+      if (req.url === "/token") { res.statusCode = req.headers.authorization === "Bearer t0k" ? 200 : 401; return res.end(); }
+      res.statusCode = 404;
+      res.end();
+    });
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r));
+  const port = (server.address() as { port: number }).port;
+  const auth = { http: { method: "POST", route: "/api/login", json: { email: "{env:VERIFY_USER}", password: "{env:VERIFY_PASS}" } }, check: "/api/me" };
+  const cfg = { ...minimal, port, rootMarker: null, auth };
+  try {
+    const { file, env } = writeFilled(cfg);
+    const run = (argv: string[], extra: Record<string, string> = {}) => runFile(file, argv, { ...env, ...extra });
+    const missing = await run(["login"]);
+    assert.equal(missing.status, 2);
+    assert.match(missing.stderr, /VERIFY_USER/);
+    const login = await run(["login"], { VERIFY_USER: "v@example.test", VERIFY_PASS: "s3cret" });
+    assert.equal(login.status, 0, login.stderr);
+    assert.match(login.stdout, /^ok login jar=/m);
+    const jar = readFileSync(join(env.APP_ROOT ?? "", ".resonator/verify/cookies.txt"), "utf8");
+    assert.match(jar, /^#HttpOnly_127\.0\.0\.1\tFALSE\t\/\tFALSE\t0\tsid\tabc$/m);
+    assert.doesNotMatch(jar, /s3cret/);
+    const me = await run(["http", "GET", "/api/me", "--expect", "200"]);
+    assert.equal(me.stdout.trim(), "200 sid=abc");
+    rmSync(join(env.APP_ROOT ?? "", ".resonator/verify/cookies.txt"));
+    const body = JSON.stringify({ email: "v@example.test", password: "s3cret" });
+    const saved = await run(["http", "POST", "/api/login", "--json", body, "--save-cookies", "--expect", "204"]);
+    assert.equal(saved.status, 0, saved.stderr);
+    assert.equal((await run(["http", "GET", "/api/me", "--expect", "200"])).stdout.trim(), "200 sid=abc");
+    const bearer = await run(["http", "GET", "/token", "--header", "Authorization: Bearer {env:VERIFY_TOKEN}", "--expect", "200", "--out", join(env.APP_ROOT ?? "", "t.json")], { VERIFY_TOKEN: "t0k" });
+    assert.equal(bearer.status, 0, bearer.stderr);
+    assert.doesNotMatch(readFileSync(join(env.APP_ROOT ?? "", "t.json"), "utf8"), /t0k/);
+    const noToken = await run(["http", "GET", "/token", "--header", "Authorization: Bearer {env:VERIFY_TOKEN}"]);
+    assert.equal(noToken.status, 2);
+    assert.match(noToken.stderr, /VERIFY_TOKEN/);
+  } finally {
+    server.close();
+  }
+});
