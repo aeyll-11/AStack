@@ -1,6 +1,6 @@
 ---
 name: verify-web
-description: "Prove each acceptance criterion against the running app: HTTP against a live dev server, the project's <app>-cli driver for UI, and tests only where nothing else reaches. Captures evidence locally. Use for /verify-web, \"verify this\", or the verify step of the feature and bug-fix playbooks."
+description: "Prove each acceptance criterion against the running app: the project's <app>-cli driver for HTTP and UI against a live dev server, and tests only where nothing else reaches. Captures evidence locally. Use for /verify-web, \"verify this\", or the verify step of the feature and bug-fix playbooks."
 disable-model-invocation: true
 ---
 
@@ -35,24 +35,25 @@ Shell variables do not survive between Bash calls. Use the printed paths and the
 
 ## 2. Get the project's driver CLI
 
-Browser criteria are driven only through the project's own `<app>-cli`, never through a script you write for this run.
+Browser and HTTP criteria are driven only through the project's own `<app>-cli`, never through a script you write for this run.
 
-- Find `.claude/skills/verify-*/SKILL.md` in the slot; `worktree.ts create` copies untracked ones from the repo root. With several, pick the one whose description names the surface you changed. Read it and its `features/README.md`. Its CLI is `node .claude/skills/verify-<app>/scripts/<app>-cli.mjs`; below it is `cli`.
+- Find `.claude/skills/verify-*/SKILL.md` in the slot; `worktree.ts create` copies untracked ones from the repo root. With several, pick the one whose description names the surface you changed. Read it and its `features/README.md`. Its `Surface:` line (`ui`, `api`, or `both`) says which commands exist. Its CLI is `node .claude/skills/verify-<app>/scripts/<app>-cli.mjs`; below it is `cli`.
 - With none, run the **create-verification-skill** skill first, then come back here and use the CLI it generated. A skill generated in the slot during a feature task is committed with that PR only if the user asked; otherwise it stays untracked and the lead copies it back to the repo root.
 - If the project has no Playwright and the user declines adding it, the generated CLI still launches, seeds, and checks the app, so `[http]` criteria run. Every `[browser]` criterion is INCONCLUSIVE with "no Playwright in the project". Never PASS.
 
-For each criterion, find the matching feature file in the map. Its `Ownership:` names the source files to read, its `Selectors:` the handles, its recipe the CLI calls. A criterion the map does not cover is still driven through the CLI; note the gap so the **maintain-verification-skill** skill adds it.
+For each criterion, find the matching feature file in the map. Its `Ownership:` names the source files to read, its `Selectors:` the handles of a page or its `Contract:` the method, fields, and status codes of a route, and its recipe the CLI calls. A criterion the map does not cover is still driven through the CLI; note the gap so the **maintain-verification-skill** skill adds it.
 
 ## 3. Launch through the CLI
 
 - **Port.** If your brief or this session has the JSON from `worktree.ts create`, use its `port`. Otherwise use `node <plugin root>/scripts/config.ts get devServer` → `basePort`, or the CLI's own default. `cli launch` refuses a port someone else holds; then pick the next free one and never drive the other instance.
 - **Start.** Run `cli launch --port <port>`, `cli seed`, `cli login`, then `cli doctor`. Copy `.resonator/verify/app.log` into `$ev/server.log` when anything fails.
+- **No auth.** With `auth: null`, `cli login` prints `skip no auth` and exits 0. Nothing needs a session.
 - **No Playwright.** `cli login` exits 3. Skip it. A doctor failure on `auth` alone then blocks only the criteria that need a session.
 - **Not ready** (`launch` or `doctor` exits non-zero): run `cli cleanup`, report `BLOCKED: <the CLI's reason>` with the last 40 lines of the log, and verify nothing.
 
 ## 4. Drive each criterion
 
-**`[http]`.** Run the request with `curl -sS -i -b .resonator/verify/cookies.txt` against `127.0.0.1:<port>`. Save the exact command and the full response (status line, headers, body) to `$ev/<n>-http.txt`. Compare status and fields with the criterion. A mutation also needs a second read that shows the stored result.
+**`[http]`.** One request per call: `cli http <METHOD> <route> [--json <body>] --expect <status> --out $ev/<n>-<slug>.json`. It sends the login cookie jar, prints `<status> <body>`, exits 1 on a status mismatch, and writes the request, status, headers, and body to the `--out` file. Compare the fields with the criterion. A mutation also needs a second `cli http GET` that shows the stored result. Only when the project has no CLI at all (its generation was blocked), run the request with `curl -sS -i -b .resonator/verify/cookies.txt` against `127.0.0.1:<port>` and save the exact command and the full response to `$ev/<n>-http.txt`.
 
 **`[browser]`.** Through the CLI only:
 
@@ -77,7 +78,7 @@ One row per criterion:
 
 | # | Criterion | Surface | Result | Evidence |
 |---|---|---|---|---|
-| 1 | POST /api/notes/42/archive returns 204 | http | PASS | `.resonator/evidence/feat-archive/1-http.txt` |
+| 1 | POST /api/notes/42/archive returns 204 | http | PASS | `.resonator/evidence/feat-archive/1-archive.json` |
 | 2 | "Archive" removes the note from /notes | browser | INCONCLUSIVE | No Playwright in the project |
 
 The overall result is the first that applies:
