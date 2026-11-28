@@ -25,7 +25,7 @@
 }
 resonator-config */
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer, request } from "node:http";
 import { dirname, join, resolve } from "node:path";
@@ -143,6 +143,9 @@ function parseSetCookie(header, url, nowSec) {
   return c;
 }
 
+// A tab, CR, or LF in a field would split or forge a tab-separated jar row.
+export const jarSafe = (c) => [c.name, c.value, c.domain, c.path].every((f) => !/[\t\r\n]/.test(f));
+
 // Response Set-Cookie headers into the Netscape jar that http reads and curl -b accepts. -1 expiry deletes.
 export function mergeJar(text, setCookies, url, nowSec = Date.now() / 1000) {
   const rows = new Map();
@@ -150,7 +153,7 @@ export function mergeJar(text, setCookies, url, nowSec = Date.now() / 1000) {
     const f = l.replace(/^#HttpOnly_/, "").split("\t");
     if (l && (!l.startsWith("#") || l.startsWith("#HttpOnly_")) && f.length >= 7) rows.set(`${f[0]}\t${f[2]}\t${f[5]}`, l);
   }
-  for (const c of setCookies.map((h) => parseSetCookie(h, url, nowSec)).filter(Boolean)) {
+  for (const c of setCookies.map((h) => parseSetCookie(h, url, nowSec)).filter((c) => c && jarSafe(c))) {
     const key = `${c.domain}\t${c.path}\t${c.name}`;
     if (c.expires < 0) rows.delete(key);
     else rows.set(key, `${c.httpOnly ? "#HttpOnly_" : ""}${[c.domain, c.sub, c.path, c.secure, c.expires, c.name, c.value].join("\t")}`);
@@ -265,9 +268,13 @@ async function status(url, opts = {}) {
   try { return (await fetch(url, { redirect: "manual", signal: AbortSignal.timeout(5000), ...opts })).status; } catch { return 0; }
 }
 const jarHeader = (url) => (existsSync(F.jar) ? jarCookies(readFileSync(F.jar, "utf8"), url) : "");
+function writeJar(text) {
+  writeFileSync(F.jar, text, { mode: 0o600 });
+  chmodSync(F.jar, 0o600);
+}
 function saveJar() {
-  const rows = (readJson(F.state)?.cookies ?? []).map((c) => [c.domain, c.domain.startsWith(".") ? "TRUE" : "FALSE", c.path, c.secure ? "TRUE" : "FALSE", Math.max(0, Math.floor(c.expires)), c.name, c.value].join("\t"));
-  writeFileSync(F.jar, `# Netscape HTTP Cookie File\n${rows.join("\n")}\n`);
+  const rows = (readJson(F.state)?.cookies ?? []).filter(jarSafe).map((c) => [c.domain, c.domain.startsWith(".") ? "TRUE" : "FALSE", c.path, c.secure ? "TRUE" : "FALSE", Math.max(0, Math.floor(c.expires)), c.name, c.value].join("\t"));
+  writeJar(`# Netscape HTTP Cookie File\n${rows.join("\n")}\n`);
 }
 function sh(cmd, env) { return spawnSync("sh", ["-c", cmd], { cwd: ROOT, stdio: "inherit", env: { ...process.env, ...env } }).status; }
 
@@ -473,7 +480,7 @@ async function send(req, saveCookies) {
   const cookie = jarHeader(req.url);
   const res = await fetch(req.url, { method: req.method, headers: { ...(cookie && { cookie }), ...headers }, body: req.body, redirect: "manual", signal: AbortSignal.timeout(req.timeoutMs) })
     .catch((e) => { throw new Exit(1, `${req.method} ${req.url}: no answer (${e.cause?.code ?? e.message}). Run doctor`); });
-  if (saveCookies) writeFileSync(F.jar, mergeJar(existsSync(F.jar) ? readFileSync(F.jar, "utf8") : "", res.headers.getSetCookie(), req.url));
+  if (saveCookies) writeJar(mergeJar(existsSync(F.jar) ? readFileSync(F.jar, "utf8") : "", res.headers.getSetCookie(), req.url));
   return { cookie, got: { status: res.status, statusText: res.statusText, headers: Object.fromEntries(res.headers), body: await res.text() } };
 }
 

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -59,6 +59,7 @@ interface CliModule {
   httpLine(status: number, body: string, max?: number): string;
   expandEnv<T>(v: T, env: Record<string, string | undefined>): T;
   mergeJar(text: string, setCookies: string[], url: string, nowSec?: number): string;
+  jarSafe(c: { name: string; value: string; domain: string; path: string }): boolean;
 }
 
 const templatePath = fileURLToPath(new URL("../skills/create-verification-skill/templates/app-cli.mjs", import.meta.url));
@@ -274,6 +275,19 @@ test("mergeJar uses the Domain attribute and the default path", () => {
   assert.match(jar, /^app\.example\.test\tFALSE\t\/api\/auth\tFALSE\t0\tb\t2$/m);
 });
 
+test("jarSafe rejects a tab, CR, or LF in any jar field", () => {
+  const ok = { name: "sid", value: "abc", domain: "127.0.0.1", path: "/" };
+  assert.equal(cli.jarSafe(ok), true);
+  for (const field of ["name", "value", "domain", "path"] as const) {
+    for (const bad of ["\t", "\r", "\n"]) assert.equal(cli.jarSafe({ ...ok, [field]: `a${bad}b` }), false, `${field} with ${JSON.stringify(bad)}`);
+  }
+});
+
+test("mergeJar skips a Set-Cookie that would forge a jar row and keeps the rest", () => {
+  const jar = cli.mergeJar("", ["evil=x\t127.0.0.1\tFALSE\t/\tFALSE\t0\tadmin\t1; Path=/", "a=1; Path=/\tx", "b=2; Domain=ex\tample.test", "ok=1; Path=/"], `${base}/login`, 1000);
+  assert.equal(jar, ["# Netscape HTTP Cookie File", "127.0.0.1\tFALSE\t/\tFALSE\t0\tok\t1", ""].join("\n"));
+});
+
 test("httpEvidence redacts Set-Cookie values", () => {
   const e = cli.httpEvidence({ method: "POST", url: base, headers: {}, timeoutMs: 10000 }, { status: 204, statusText: "No Content", headers: { "set-cookie": "sid=abc" }, body: "" });
   assert.equal(e.headers["set-cookie"], "<redacted>");
@@ -435,15 +449,20 @@ test("http --save-cookies and an HTTP auth login fill the jar, need no Playwrigh
     const login = await run(["login"], { VERIFY_USER: "v@example.test", VERIFY_PASS: "s3cret" });
     assert.equal(login.status, 0, login.stderr);
     assert.match(login.stdout, /^ok login jar=/m);
-    const jar = readFileSync(join(env.APP_ROOT ?? "", ".resonator/verify/cookies.txt"), "utf8");
+    const jarPath = join(env.APP_ROOT ?? "", ".resonator/verify/cookies.txt");
+    const jar = readFileSync(jarPath, "utf8");
+    assert.equal(statSync(jarPath).mode & 0o777, 0o600);
     assert.match(jar, /^#HttpOnly_127\.0\.0\.1\tFALSE\t\/\tFALSE\t0\tsid\tabc$/m);
     assert.doesNotMatch(jar, /s3cret/);
     const me = await run(["http", "GET", "/api/me", "--expect", "200"]);
     assert.equal(me.stdout.trim(), "200 sid=abc");
     rmSync(join(env.APP_ROOT ?? "", ".resonator/verify/cookies.txt"));
     const body = JSON.stringify({ email: "v@example.test", password: "s3cret" });
+    writeFileSync(jarPath, "# Netscape HTTP Cookie File\n", { mode: 0o644 });
+    chmodSync(jarPath, 0o644);
     const saved = await run(["http", "POST", "/api/login", "--json", body, "--save-cookies", "--expect", "204"]);
     assert.equal(saved.status, 0, saved.stderr);
+    assert.equal(statSync(jarPath).mode & 0o777, 0o600);
     assert.equal((await run(["http", "GET", "/api/me", "--expect", "200"])).stdout.trim(), "200 sid=abc");
     const bearer = await run(["http", "GET", "/token", "--header", "Authorization: Bearer {env:VERIFY_TOKEN}", "--expect", "200", "--out", join(env.APP_ROOT ?? "", "t.json")], { VERIFY_TOKEN: "t0k" });
     assert.equal(bearer.status, 0, bearer.stderr);
