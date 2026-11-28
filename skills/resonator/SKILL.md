@@ -29,7 +29,7 @@ The Principles section grounds every trigger. In your reply, name each principle
 - A fork you could settle by running something → run the **prototype** playbook instead of asking.
 - Code → name the data shape first. Across a function boundary → **architect**. Fan-out → **swarm**. Bakeoff → **arena**. Contested design → **interrogate**.
 - Prose, your reply included → **unslop**. Docs, PR descriptions, commit messages → **technical-writing**.
-- Before commit → **no-comments**, then **unslop** on the prose in the diff.
+- Before commit → **no-comments**, then **unslop** on the prose in the diff. Every commit follows the **commit** skill.
 - UI change → **verify-web** against the running app. Backend change → **verify-web** over HTTP. "Tests pass" is not verification.
 - Review → **pr-review**. CI → **shorekeeper**.
 - A number you measured → **benchmark-checklist**.

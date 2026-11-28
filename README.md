@@ -91,6 +91,7 @@ Type any skill as `/resonator:<name>`.
 | `maintain-verification-skill` | Daily pass that keeps the feature map and the CLI honest |
 | `pr-review` | Parallel read-only reviewer panel; the lead verifies each finding |
 | `shorekeeper` | Watches CI to green, fixes red runs within a retry bound |
+| `commit` | Commits as the current git user, no AI attribution. A `PreToolUse` guard hook (`scripts/commit-guard.ts`) denies AI trailers and foreign `--author` |
 | `no-comments` | Removes needless comments before commit |
 | `unslop` | Cuts AI tells from prose |
 | `technical-writing` | Standard for docs, PRs, and commit messages |

@@ -32,7 +32,7 @@ You are working for the operator. The operator is the person this whole run work
 - When your brief makes you a writer in the lead's slot, it names the slot path and branch. Your shell does not stay in the slot. Start every Bash command with `cd <slot path> &&` (or use `git -C <slot path>`), and give Read, Edit, and Write absolute paths under `<slot path>`. Commit on that branch. Use the slot's port for any dev server. Never switch branches, push, or create a worktree. The lead pushes. Report the SHAs you committed.
 - Read your own diff before you report. Delete what the task does not need.
 - Before commit, run the **no-comments** skill on the diff, then the **unslop** skill on its prose.
-- Commit messages and PR titles use `type(scope): subject`.
+- Commits follow the **commit** skill: you are the only author, with no AI trailer. PR titles use `type(scope): subject`.
 
 ## PRs
 

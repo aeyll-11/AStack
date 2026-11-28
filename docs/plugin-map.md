@@ -29,7 +29,7 @@ Every Resonator plugin feature, how it is proved, and the command that proves it
 | Verification: verify-web, create-verification-skill, maintain-verification-skill | `skills/{verify-web,create-verification-skill,maintain-verification-skill}/` | smoke: lint and references. e2e: a run against a live app | `npm run verify` |
 | App driver CLI template (`<app>-cli`) | `skills/create-verification-skill/templates/app-cli.mjs` | unit: `tests/app-cli-template.test.ts` covers argument parsing, target resolution, and the config block. e2e: launch, drive, and cleanup against a fixture app | `npm test`; `docs/acceptance/README.md` |
 | Review and CI: pr-review, shorekeeper | `skills/{pr-review,shorekeeper}/` | smoke: lint and references. e2e: CI watch on a real PR | `npm run verify`; `docs/acceptance/` |
-| Prose and cleanup: no-comments, unslop, technical-writing, typescript-best-practices | `skills/{no-comments,unslop,technical-writing,typescript-best-practices}/` | smoke: lint and references | `npm run verify` |
+| Prose and cleanup: commit, no-comments, unslop, technical-writing, typescript-best-practices | `skills/{commit,no-comments,unslop,technical-writing,typescript-best-practices}/` | smoke: lint and references | `npm run verify` |
 | Orchestration: swarm, arena, interrogate, blast-radius, benchmark-checklist, figure-it-out, show-me-your-work | `skills/{swarm,arena,interrogate,blast-radius,benchmark-checklist,figure-it-out,show-me-your-work}/` | smoke: lint, references, `config.ts model` roles are valid | `npm run verify` |
 | Context: how, why, recall, ketchup, reflect, correct | `skills/{how,why,recall,ketchup,reflect,correct}/` | smoke: lint and references | `npm run verify` |
 | Principles (24) | `skills/principle-*/` | smoke: lint and every `**principle-x**` reference resolves | `npm run verify` |
@@ -51,6 +51,7 @@ Every Resonator plugin feature, how it is proved, and the command that proves it
 | config (`path`, `get`, `set`, `model <role>`) | `scripts/config.ts`, `scripts/lib/config.ts` | unit: `tests/config.test.ts`; smoke: `path`, `model lead`, unknown role exits 2 | `npm test`; `npm run verify` |
 | detect (stack packs) | `scripts/detect.ts`, `scripts/lib/detect.ts`, `tests/fixtures/repos/*` | unit: `tests/detect.test.ts`; smoke: each fixture prints its expected array | `npm test`; `npm run verify` |
 | session-start | `scripts/session-start.ts` | unit: `tests/session-start.test.ts`; smoke: stdin JSON gives `hookSpecificOutput` with the router path | `npm test`; `npm run verify` |
+| commit-guard | `scripts/commit-guard.ts` | unit: `tests/commit-guard.test.ts` covers `-m`, `-F`, `--author`, `--trailer`, `-C`, heredoc, and the PreToolUse deny output; smoke: piped JSON | `npm test` |
 | lint | `scripts/lint.ts` | unit: `tests/lint.test.ts`; smoke: runs clean on the repo | `npm test`; `npm run lint` |
 | worktree (`create`, `remove`; copies untracked `.env*`, `.resonator/config.json`, `.claude/skills/verify-*/`) | `scripts/worktree.ts`, `scripts/lib/git.ts` | unit: `tests/worktree.test.ts`; smoke: create and remove in a temp repo | `npm test`; `npm run verify` |
 | evidence (`push --pr <n> <files...>`) | `scripts/evidence.ts` | unit: `tests/evidence.test.ts`; smoke: no args gives a usage error. e2e: a real push | `npm test`; `npm run verify` |
@@ -65,6 +66,7 @@ Every Resonator plugin feature, how it is proved, and the command that proves it
 | Feature | Files | How it is proved | Command |
 |---|---|---|---|
 | SessionStart hook | `hooks/hooks.json`, `scripts/session-start.ts` | smoke: script output; lint scans `hooks/`. e2e: a fresh Claude Code session shows the router pointer | `npm run verify`; `docs/acceptance/` |
+| PreToolUse commit guard | `hooks/hooks.json`, `scripts/commit-guard.ts`, `skills/commit/` | unit: `tests/commit-guard.test.ts`; lint scans `hooks/` and the skill. e2e: a live commit with an AI trailer is denied | `npm test`; `npm run verify` |
 | Plugin manifest | `.claude-plugin/plugin.json` | unit: `tests/manifest.test.ts`; smoke: `claude plugin validate .` | `npm test`; `npm run verify` |
 | Marketplace manifest | `.claude-plugin/marketplace.json` | unit: `tests/manifest.test.ts`; smoke: `claude plugin validate .` | `npm test`; `npm run verify` |
 | Merge ban | `scripts/lint.ts` (`merge-ban` rule) | unit: `tests/lint.test.ts`. e2e: no merge after a live run | `npm test`; `docs/acceptance/` |

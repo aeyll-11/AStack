@@ -6,6 +6,8 @@
 
 The router is the entry point for non-trivial work. With `routerHook` on, a `SessionStart` pointer sends such tasks to it automatically.
 
+A `PreToolUse` hook on Bash guards every `git commit`. It denies a message with an AI `Co-Authored-By:` or "Generated with Claude Code" line, and an `--author` that is not your git identity. The **commit** skill states the same rules, so the model gets it right the first time.
+
 ## What it does first
 
 1. Runs `node <plugin root>/scripts/detect.ts` and names the active packs.

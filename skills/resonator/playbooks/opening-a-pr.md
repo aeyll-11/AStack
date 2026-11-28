@@ -2,7 +2,7 @@
 
 The shared tail of every code playbook. It takes verified work to a green PR with a human notified. Red past the retry bound, or a conflict, still notifies, with the PR left draft. It never merges.
 
-1. **Prepare the branch.** Work in the PR slot from the router's Mechanics, and keep unrelated work out of it. Rebase into small, landable commits. Run the **no-comments** skill on the diff, then the **unslop** skill on the prose in the diff. Push with `git push -u origin HEAD`, never with force.
+1. **Prepare the branch.** Work in the PR slot from the router's Mechanics, and keep unrelated work out of it. Rebase into small, landable commits per the **commit** skill. Run the **no-comments** skill on the diff, then the **unslop** skill on the prose in the diff. Push with `git push -u origin HEAD`, never with force.
 2. **Open the PR as draft.** `gh pr create --draft --title "<type(scope): subject>" --body-file <file>`. The title follows Conventional Commits and names a real symbol when one carries the change. Write the body with the **technical-writing** skill: 40 lines at most, not counting the Spec block, with these `##` headings in order, empty ones dropped:
    - `## Why`: the goal, first. A phoebe owner ends it with its `Closes` line.
    - `## Spec`: `<repo>/.resonator/spec/<branch>.md` pasted verbatim. That file already opens with `## Spec` and holds Goal, Acceptance criteria, Guesses, and Open questions as `###` headings.
