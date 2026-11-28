@@ -48,7 +48,8 @@ For each criterion, find the matching feature file in the map. Its `Ownership:` 
 - **Port.** If your brief or this session has the JSON from `worktree.ts create`, use its `port`. Otherwise use `node <plugin root>/scripts/config.ts get devServer` → `basePort`, or the CLI's own default. `cli launch` refuses a port someone else holds; then pick the next free one and never drive the other instance.
 - **Start.** Run `cli launch --port <port>`, `cli seed`, `cli login`, then `cli doctor`. Copy `.resonator/verify/app.log` into `$ev/server.log` when anything fails.
 - **No auth.** With `auth: null`, `cli login` prints `skip no auth` and exits 0. Nothing needs a session.
-- **No Playwright.** `cli login` exits 3. Skip it. A doctor failure on `auth` alone then blocks only the criteria that need a session.
+- **No Playwright.** An `http` auth (`auth.http` in the config) signs in without a browser, so `cli login` still works. Only a `form` auth exits 3. Skip it then. A doctor failure on `auth` alone then blocks only the criteria that need a session.
+- **Credentials.** `cli login` exits 2 and names the missing env var (`VERIFY_USER`, `VERIFY_TOKEN`). Report BLOCKED with that name. Never write the secret into a file or a command line; pass a token as `--header "Authorization: Bearer {env:VERIFY_TOKEN}"`.
 - **Not ready** (`launch` or `doctor` exits non-zero): run `cli cleanup`, report `BLOCKED: <the CLI's reason>` with the last 40 lines of the log, and verify nothing.
 
 ## 4. Drive each criterion
