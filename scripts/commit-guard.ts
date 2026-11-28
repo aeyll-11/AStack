@@ -9,6 +9,7 @@ export interface CommitCommand {
   files: string[];
   authors: string[];
   trailers: string[];
+  rawBody: boolean;
 }
 
 export interface Identity {
@@ -23,7 +24,7 @@ export interface Context {
 
 const AI_NAME = /claude|anthropic|noreply@anthropic\.com|\bgpt\b|openai|copilot|gemini/i;
 const CO_AUTHOR = /^\s*co-authored-by:\s*(.*)$/i;
-const GENERATED = /generated\s+(?:with|by)\s+\[?[^\n]*?(?:claude|anthropic)/i;
+const GENERATED = /^\W*(?:🤖\s*)?generated\s+(?:with|by)\s+\[?(?:claude|anthropic|claude code)/im;
 
 function splitSegments(command: string): string[][] {
   const segments: string[][] = [];
@@ -101,9 +102,15 @@ function parseGhBody(args: string[], result: CommitCommand): void {
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     let m: RegExpExecArray | null;
-    if ((m = /^--(body|body-file)=(.*)$/s.exec(a))) put(result, m[1] === "body" ? "message" : "file", m[2]);
-    else if (a === "--body" || a === "-b") put(result, "message", i + 1 < args.length ? args[++i] : "");
-    else if (a === "--body-file" || a === "-F") put(result, "file", i + 1 < args.length ? args[++i] : "");
+    let kind: "message" | "file" | null = null;
+    let value = "";
+    if ((m = /^--(body|body-file)=(.*)$/s.exec(a))) [kind, value] = [m[1] === "body" ? "message" : "file", m[2]];
+    else if (a === "--body" || a === "-b") [kind, value] = ["message", i + 1 < args.length ? args[++i] : ""];
+    else if (a === "--body-file" || a === "-F") [kind, value] = ["file", i + 1 < args.length ? args[++i] : ""];
+    else if ((m = /^-([bF])(.+)$/s.exec(a))) [kind, value] = [m[1] === "b" ? "message" : "file", m[2]];
+    if (kind === null) continue;
+    put(result, kind, value);
+    result.rawBody = true;
   }
 }
 
@@ -112,13 +119,13 @@ export function parseCommitCommand(command: string): CommitCommand | null {
   for (const tokens of splitSegments(command)) {
     const gh = ghBodyArgs(tokens);
     if (gh) {
-      result ??= { dir: null, messages: [], files: [], authors: [], trailers: [] };
+      result ??= { dir: null, messages: [], files: [], authors: [], trailers: [], rawBody: false };
       parseGhBody(gh, result);
       continue;
     }
     const found = commitArgs(tokens);
     if (!found) continue;
-    result ??= { dir: found.dir, messages: [], files: [], authors: [], trailers: [] };
+    result ??= { dir: found.dir, messages: [], files: [], authors: [], trailers: [], rawBody: false };
     const { args } = found;
     for (let i = 0; i < args.length; i++) {
       const a = args[i];
@@ -133,6 +140,7 @@ export function parseCommitCommand(command: string): CommitCommand | null {
       }
     }
   }
+  if (result && result.files.includes("-")) result.rawBody = true;
   return result;
 }
 
@@ -160,7 +168,7 @@ export function findViolations(cmd: CommitCommand, ctx: Context, rawCommand?: st
     const text = ctx.readFile(resolve(cmd.dir ?? process.cwd(), f));
     if (text !== null) scanText(text, `the message file ${f}`, out);
   }
-  if (rawCommand !== undefined && cmd.messages.length > 0 && out.length === 0) scanText(rawCommand, "the command", out);
+  if (rawCommand !== undefined && (cmd.messages.length > 0 || cmd.rawBody) && out.length === 0) scanText(rawCommand, "the command", out);
   for (const a of cmd.authors) {
     const id = ctx.identity;
     if (id === null) out.push(`--author "${a}" is set but git user.name/user.email are not configured`);
