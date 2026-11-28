@@ -1,6 +1,7 @@
 import { appendFileSync, copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:net";
 import { pathToFileURL } from "node:url";
 import { loadConfig } from "./lib/config.ts";
@@ -164,9 +165,41 @@ export async function createSlot(opts: {
   return { branch, path, port, envFiles, resonatorConfig, verifySkills, installed };
 }
 
-export function removeSlot(repoRoot: string, branch: string): void {
+function sameFile(a: string, b: string): boolean {
+  return existsSync(a) && existsSync(b) && readFileSync(a).equals(readFileSync(b));
+}
+
+export function uncommitted(repoRoot: string, path: string): string[] {
+  const out = execFileSync("git", ["status", "--porcelain", "-z", "--untracked-files=all"], { cwd: path, encoding: "utf8" });
+  const entries = out.split("\0").filter(Boolean);
+  const dirty: string[] = [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (e[0] === "R" || e[0] === "C") i++;
+    const file = e.slice(3);
+    if (e.startsWith("??") && sameFile(join(path, file), join(repoRoot, file))) continue;
+    dirty.push(e);
+  }
+  return dirty;
+}
+
+export type Removal = { removed: true } | { removed: false; reason: "absent" };
+
+export function removeSlot(repoRoot: string, branch: string, opts: { force?: boolean } = {}): Removal {
   const path = join(repoRoot, ".worktrees", branch.replaceAll("/", "-"));
+  if (!existsSync(path)) {
+    if (!isRegistered(repoRoot, path)) return { removed: false, reason: "absent" };
+    run("git", ["worktree", "prune"], repoRoot);
+    return { removed: true };
+  }
+  if (!opts.force) {
+    const dirty = uncommitted(repoRoot, path);
+    if (dirty.length) {
+      throw new Error(`resonator: slot ${path} has uncommitted changes:\n${dirty.join("\n")}\nCommit them, or pass --force to discard them.`);
+    }
+  }
   run("git", ["worktree", "remove", "--force", path], repoRoot);
+  return { removed: true };
 }
 
 function flag(args: string[], name: string): string | undefined {
@@ -180,7 +213,7 @@ export async function main(argv: string[]): Promise<void> {
     const cwd = process.cwd();
     const repoRoot = run("git", ["rev-parse", "--show-toplevel"], cwd);
     const branch = flag(rest, "--branch");
-    if (!branch) throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b>");
+    if (!branch) throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b> [--force]");
     if (cmd === "create") {
       const slot = Number(flag(rest, "--slot") ?? "0");
       if (!Number.isInteger(slot) || slot < 0) throw new Error("--slot must be a non-negative integer");
@@ -189,10 +222,10 @@ export async function main(argv: string[]): Promise<void> {
       const result = await createSlot({ repoRoot, branch, slot, basePort, base: flag(rest, "--base") });
       process.stdout.write(JSON.stringify(result) + "\n");
     } else if (cmd === "remove") {
-      removeSlot(repoRoot, branch);
-      process.stdout.write(JSON.stringify({ removed: branch }) + "\n");
+      const result = removeSlot(repoRoot, branch, { force: rest.includes("--force") });
+      process.stdout.write(JSON.stringify({ ...result, branch }) + "\n");
     } else {
-      throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b>");
+      throw new Error("usage: worktree.ts create --branch <b> --slot <n> [--base origin/main] | remove --branch <b> [--force]");
     }
   } catch (e) {
     process.stderr.write(`${(e as Error).message}\n`);

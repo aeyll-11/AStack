@@ -36,10 +36,10 @@ Read the queue config first: `node <plugin root>/scripts/config.ts get issues` (
 
 Read its result. Review its PR diff yourself, since you own every agent's work. Owners send no push notification. On `green`, `escalated`, or `conflict`, if `node <plugin root>/scripts/config.ts get notify.push` prints `true`, send the PR link and its result with the `PushNotification` tool.
 
-- **green.** Comment `PR <link> is green and ready for review.` on the issue. Remove the slot: `node <plugin root>/scripts/worktree.ts remove --branch <branch>`. Set the task to `done`. The label stays until the PR's `Closes #<n>` closes the issue.
+- **green.** Comment `PR <link> is green and ready for review.` on the issue. From the repo root, never from inside the slot, remove it: `node <plugin root>/scripts/worktree.ts remove --branch <branch>`, never with `--force`. If it refuses for uncommitted changes, keep the slot and name it and the files in your reply. Set the task to `done`. The label stays until the PR's `Closes #<n>` closes the issue.
 - **escalated** or **conflict.** Keep the slot for the human. Comment on the issue with what is failing: each check by name and link, or the base to rebase on. The PR stays draft. Set the task to `escalated`.
-- **unclear.** The owner already asked its question and released the issue with `--needs-info`. Remove the slot. Set the task to `skipped`.
-- **closed.** Remove the slot. Set the task to `done`.
+- **unclear.** The owner already asked its question and released the issue with `--needs-info`. Remove the slot as under green. Set the task to `skipped`.
+- **closed.** The owner's shorekeeper run already removed the slot or kept it with a reason. Report which, and remove nothing. Set the task to `done`.
 
 ## Pacing
 
