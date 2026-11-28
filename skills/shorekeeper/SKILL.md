@@ -50,7 +50,7 @@ Return one line: the state (`green`, `red`, `conflict`, `closed`, or `escalated`
 - **escalated.** Return `escalated` with the watcher's reason.
 - **red.** If no check failed, return `escalated` and say GitHub refuses the merge while every visible check passes. If `encore` is at or above the retry cap, Encore is spent. Return `escalated`. Otherwise run Encore (step 3).
 - **conflict.** Run the conflict pass (step 4).
-- **closed.** Someone closed or merged the PR outside this loop. Clean up its slot, then return `closed`. Take the head branch from `gh pr view <n> --json headRefName -q .headRefName` and find the slot path from `git worktree list --porcelain`. When that path is under `.worktrees/`, run `node <plugin root>/scripts/worktree.ts remove --branch <head>`, never with `--force`. It refuses a slot with uncommitted changes, exits 1, and lists them. Then keep the slot and report its path and the files it listed.
+- **closed.** Someone closed or merged the PR outside this loop. Clean up its slot, then return `closed`. Take the head branch from `gh pr view <n> --json headRefName -q .headRefName` and find the slot path from `git worktree list --porcelain`. When that path is under `.worktrees/`, `cd` to the repo root first, since the slot may be your cwd. The root is the first `worktree` line of `git worktree list --porcelain`. Then run `node <plugin root>/scripts/worktree.ts remove --branch <head>`, never with `--force`. A slot already gone prints `"reason":"absent"` and exits 0. A slot with uncommitted changes is refused with exit 1 and a list of them. Then keep the slot and report its path and the files it listed.
 
 ## 3. Encore
 
@@ -81,5 +81,6 @@ Reply to the caller with:
 - The PR link, and `encore` against the cap, such as `encore 2/3`.
 - Each fix: its root cause in one line and its commit link.
 - For `escalated`: every failing check by name and link, and what you tried. The PR stays draft.
+- For `closed`: whether the slot was removed, or its path and the files that kept it.
 - For `conflict`: the base branch, the conflicting paths, and whether a merge was attempted.
 - `unresolvedThreads`, when it is above zero.

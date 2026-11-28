@@ -236,3 +236,16 @@ test("worktree.ts remove needs --force for a dirty slot", async () => {
   assert.equal(forced.status, 0, forced.stderr);
   assert.ok(!existsSync(slot.path));
 });
+
+test("removeSlot on an absent slot returns quietly", async () => {
+  const repo = makeRepo(false);
+  assert.deepEqual(removeSlot(repo, "never-made"), { removed: false, reason: "absent" });
+  const slot = await createSlot({ repoRoot: repo, branch: "twice", slot: 0, basePort: 3100 });
+  assert.deepEqual(removeSlot(repo, "twice"), { removed: true });
+  assert.ok(!existsSync(slot.path));
+  assert.deepEqual(removeSlot(repo, "twice"), { removed: false, reason: "absent" });
+  const cli = join(import.meta.dirname, "..", "scripts", "worktree.ts");
+  const again = spawnSync(process.execPath, [cli, "remove", "--branch", "twice"], { cwd: repo, encoding: "utf8" });
+  assert.equal(again.status, 0, again.stderr);
+  assert.deepEqual(JSON.parse(again.stdout), { removed: false, branch: "twice", reason: "absent" });
+});
